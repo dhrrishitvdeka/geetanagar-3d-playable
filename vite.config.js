@@ -25,7 +25,7 @@ export default defineConfig({
   // top-level await loads data/geo.json before the world modules evaluate
   // two pages: the explorer (index.html) and the game (game.html)
   build: { target: 'es2022', chunkSizeWarningLimit: 2000, rollupOptions: { input: { main: 'index.html', game: 'game.html' } } },
-  server: { port: 5173, watch: { ignored: ['**/screenshots/**', '**/legacy/**'] } },
+  server: { port: 5173, watch: { ignored: ['**/screenshots/**'] } },
   // pre-bundle every three.js addon up front; discovering them lazily caused reload loops in dev
   optimizeDeps: {
     include: ['three', 'three/addons/controls/OrbitControls.js', 'three/addons/utils/BufferGeometryUtils.js', 'three/addons/loaders/GLTFLoader.js', 'three/addons/utils/SkeletonUtils.js',

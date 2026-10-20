@@ -24,7 +24,6 @@ npm run build      # static build in dist/
 | `data/geo.json` | Footprints, roads, class raster, terrain grid, field/park polygons, labels (local metres, x = east, y = north, origin 26.1735 N, 91.7900 E) |
 | `public/assets/` | Textures, GLB models, HDRI |
 | `pipeline/` | Offline data tools (Python); runtime never imports from here |
-| `legacy/` | The original single-file prototype and its base64 assets, kept for reference |
 | `screenshots/<milestone>/` | Comparison captures from the five standard viewpoints |
 
 ## Game
