@@ -1,0 +1,20 @@
+{
+  "_about": "Landmarks verified on Google Maps (place pins, 2026-10-15) that geo.json's traced labels lack. x,y are local metres (x = (lon-91.79)*99910, y = (lat-26.1735)*110800). Appended to GEO.labels at load.",
+  "items": [
+    { "t": "Alakh Niranjan Shiv Mandir", "x": -510, "y": 318, "k": "lm", "src": "maps" },
+    { "t": "Shiv Mandir", "x": -315, "y": 251, "k": "lm", "src": "maps" },
+    { "t": "Sai Baba And Shiv Mandir", "x": -150, "y": -321, "k": "lm", "src": "maps" },
+    { "t": "Sri Sri Bura Gosai Than", "x": -746, "y": 42, "k": "lm", "src": "maps" },
+    { "t": "Hatigarh Sarbojanin Namghar", "x": -729, "y": 93, "k": "lm", "src": "maps" },
+    { "t": "Sarbojonin Namghar", "x": -100, "y": 115, "k": "lm", "src": "maps" },
+    { "t": "Akanir Namghar", "x": 433, "y": -125, "k": "lm", "src": "maps" },
+    { "t": "Geetanagar LP School", "x": -68, "y": 16, "k": "lm", "src": "maps" },
+    { "t": "Adarsh Hindi Vidyalaya", "x": -524, "y": 341, "k": "lm", "src": "maps" },
+    { "t": "Bhaskar Nagar L.P. School", "x": -700, "y": 315, "k": "lm", "src": "maps" },
+    { "t": "Sparsh High & Day Care", "x": 6, "y": -41, "k": "lm", "src": "maps" },
+    { "t": "SBI ATM", "x": -340, "y": -78, "k": "lm", "src": "maps" }
+  ],
+  "_corrections": {
+    "View point": { "x": 78.0, "y": 199.1, "src": "maps place pin 26.1752971, 91.7907812" }
+  }
+}

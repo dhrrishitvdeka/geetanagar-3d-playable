@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Geetanagar 3D</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@600;700&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+<div id="app">
+  <canvas id="gl" aria-label="3D model of Geetanagar, Guwahati. Use Walk to explore on foot, or drag to orbit and scroll to zoom."></canvas>
+  <div id="labels"></div>
+  <div class="crosshair"></div>
+
+  <header class="card title">
+    <h1>Geetanagar</h1>
+    <p>Guwahati, Assam. Mother Teresa Rd, the field, the hill up to Faculty School, and Hatigarh Chariali.</p>
+    <a href="game.html" style="display:inline-block;margin-top:8px;padding:6px 14px;border-radius:8px;background:var(--accent);color:var(--accent-ink);font-weight:600;text-decoration:none">Play the game</a>
+    <details>
+      <summary>How this was built</summary>
+      <p>The <span id="count">1,449</span> building outlines and every road are traced from Google Maps' top view; the field and park outlines from satellite imagery, and the footpaths, divider, railings and park fence from Street View (Mar 2026). Hill shapes come from Google's terrain layer, with Faculty School set about 38 m above the road. Building heights and colours are estimates.</p>
+    </details>
+  </header>
+
+  <canvas id="mini" width="190" height="190" aria-label="Mini map. Click to jump there on foot."></canvas>
+
+  <div class="card" id="walkhint" hidden>
+    <span class="unlocked">Click the view to look around · <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk · <kbd>Shift</kbd> run · click the map to jump</span>
+    <span class="lockedmsg"><kbd>Esc</kbd> to free the mouse · <kbd>M</kbd> map</span>
+  </div>
+  <div id="joy" aria-hidden="true"><div id="knob"></div></div>
+
+  <div class="card dock" role="group" aria-label="Controls">
+    <div class="seg" role="group" aria-label="Mode">
+      <button type="button" id="btn-orbit" aria-pressed="true">Aerial</button>
+      <button type="button" id="btn-walk" aria-pressed="false">Walk</button>
+    </div>
+    <label for="spot" class="tog">Start at
+      <select id="spot">
+        <option value="viewpoint">View point lookout</option>
+        <option value="field">Geetanagar Field</option>
+        <option value="mandir">Mandir gate</option>
+        <option value="hatigarh">Hatigarh Chariali</option>
+        <option value="sbi">SBI Gitanagar</option>
+        <option value="park">Children's Park</option>
+      </select>
+    </label>
+    <button type="button" class="chip walkonly" id="btn-run" aria-pressed="false">Run</button>
+    <button type="button" class="chip" id="btn-map" aria-pressed="true">Map</button>
+    <label class="sunctl" for="sun">Sun <input type="range" id="sun" min="6" max="17.5" step="0.25" value="16.25"><output id="clock" for="sun">4:15 pm</output></label>
+    <label class="tog" for="quality">Quality <select id="quality"><option value="low">Low</option><option value="medium">Medium</option><option value="high" selected>High</option></select></label>
+    <label class="tog" for="tog-labels"><input type="checkbox" id="tog-labels" checked>Labels</label>
+  </div>
+
+  <div id="loading">Laying out Geetanagar…</div>
+  <div id="nogl" hidden><div><strong>This browser can't draw 3D graphics here.</strong><br>Open the page in a current Chrome, Safari, Edge or Firefox with hardware acceleration on.</div></div>
+</div>
+
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>

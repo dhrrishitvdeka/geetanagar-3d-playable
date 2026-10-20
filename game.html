@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Geetanagar: the game</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@600;700&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+<div id="app" class="game">
+  <canvas id="gl" aria-label="Geetanagar, Guwahati: a third-person walk-around game. Click to look around, WASD to move, E to interact."></canvas>
+  <div id="labels"></div>
+  <div id="hud"></div>
+  <div id="joy" aria-hidden="true"><div id="knob"></div></div>
+
+  <!-- elements the shared explorer modules (ui/controls.js, ui/minimap.js) expect; the game never shows them -->
+  <div id="compat" hidden>
+    <button type="button" id="btn-walk"></button><button type="button" id="btn-orbit"></button>
+    <button type="button" id="btn-run"></button><button type="button" id="btn-map"></button>
+    <div id="walkhint"></div>
+    <canvas id="mini" width="190" height="190"></canvas>
+  </div>
+
+  <div id="loading">Laying out Geetanagar…</div>
+  <div id="nogl" hidden><div><strong>This browser can't draw 3D graphics here.</strong><br>Open the page in a current Chrome, Safari, Edge or Firefox with hardware acceleration on.</div></div>
+</div>
+
+<script type="module" src="/src/game/main.js"></script>
+</body>
+</html>

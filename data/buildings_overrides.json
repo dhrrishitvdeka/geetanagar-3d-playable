@@ -1,0 +1,311 @@
+{
+  "_readme": "Hand-checked facts per building, keyed by index in GEO.buildings. Fields (all optional): floors, wall (hex), shops (true/false), roof ('tin'|'flat'), roofCol (hex, tin roofs), style ('rcc'|'slide'|'assam'|'blank'), unfinished (bool), conf ('high'|'medium'|'low' = how sure the Street View match is), note. Panos: Google Street View, Mar 2026 imagery, viewed 2026-10-15; 'x -357 S' = looking south from the pano at local x = -357 on Mother Teresa Rd.",
+  "_survey": {
+    "x0": -505,
+    "x1": 92,
+    "shops": false,
+    "note": "Street View between Hatigarh Chariali and the mandir: mostly walled residential compounds. Inside this x range a building only gets shopfronts if it is marked shops: true here."
+  },
+  "832": {
+    "floors": 3,
+    "wall": "#c9a98c",
+    "shops": false,
+    "conf": "medium",
+    "note": "NW corner of Hatigarh Chariali: tan 3-storey house with pinkish slab edges, set back behind a big corner tree and the kiosk (pano 9Yn0U7qxM9dqWNLUej2-3g heading 330, Mar 2026)"
+  },
+  "905": {
+    "floors": 3,
+    "wall": "#c4c3bd",
+    "shops": true,
+    "conf": "medium",
+    "note": "SW corner of Hatigarh: grey 3-storey shop building with a lattice mobile tower on the roof and cycle-rickshaws parked in front (pano 9Yn0U7qxM9dqWNLUej2-3g heading 215, Mar 2026; was logged as a yellow 4-storey)"
+  },
+  "916": {
+    "floors": 3,
+    "wall": "#d3cdbf",
+    "shops": true,
+    "conf": "medium",
+    "note": "SE corner of Hatigarh: 3-storey shop building covered in signboards (x -500 S)"
+  },
+  "909": {
+    "floors": 6,
+    "wall": "#d8bf6a",
+    "shops": true,
+    "conf": "medium",
+    "note": "yellow 6-storey apartment with maroon corner bays, pharmacy and shops on the ground floor (x -478 S). Footprint runs on to x -445 where Street View shows a garden compound with a green gate instead."
+  },
+  "791": {
+    "floors": 6,
+    "wall": "#e2c2aa",
+    "shops": false,
+    "conf": "medium",
+    "note": "salmon-and-cream apartment complex behind a boundary wall and gate (x -449 N, x -478 N)"
+  },
+  "851": {
+    "floors": 1,
+    "wall": "#e9e6df",
+    "shops": false,
+    "conf": "low",
+    "note": "gatehouse of the apartment complex (x -449 N)"
+  },
+  "856": {
+    "floors": 1,
+    "wall": "#e9e6df",
+    "shops": false,
+    "conf": "low",
+    "note": "small structure beside the apartment gate (x -449 N)"
+  },
+  "908": {
+    "floors": 2,
+    "wall": "#ebe8e2",
+    "shops": false,
+    "conf": "medium",
+    "note": "old 2-storey white house with a maroon band, behind brick wall and white gate pillars (x -418 S)"
+  },
+  "802": {
+    "floors": 4,
+    "wall": "#eceae4",
+    "shops": false,
+    "conf": "medium",
+    "note": "white 4-storey behind a white garden wall with bougainvillea (x -388 N)"
+  },
+  "900": {
+    "floors": 5,
+    "wall": "#e3d4a6",
+    "shops": false,
+    "conf": "high",
+    "note": "cream/yellow 5-storey apartment with maroon floor bands and stilt parking (x -388 S, x -357 S)"
+  },
+  "847": {
+    "floors": 1,
+    "wall": "#e9e7e2",
+    "shops": false,
+    "conf": "medium",
+    "note": "guard booth with a business sign at a compound gate (x -357 N)"
+  },
+  "781": {
+    "floors": 4,
+    "wall": "#d8d2c4",
+    "shops": false,
+    "conf": "low",
+    "note": "cream/grey 4-storey with an orange balcony band behind the gate (x -357 N); a shop with a green sign sits at its west end"
+  },
+  "898": {
+    "floors": 5,
+    "wall": "#b7cc97",
+    "shops": false,
+    "conf": "high",
+    "note": "light green 5-storey apartment block (x -357 S, x -325 S)"
+  },
+  "811": {
+    "floors": 1,
+    "roof": "tin",
+    "roofCol": "#8a5a44",
+    "wall": "#e2dccd",
+    "shops": false,
+    "conf": "medium",
+    "note": "single-storey bungalow with a brown hipped (tiled) roof behind a hedge (x -325 N)"
+  },
+  "906": {
+    "floors": 5,
+    "wall": "#cf9f86",
+    "shops": false,
+    "conf": "medium",
+    "note": "5-storey apartment with brown/pink stripes on its corner, brown shutter garage (x -296 S)"
+  },
+  "912": {
+    "floors": 6,
+    "wall": "#e3d2a8",
+    "shops": false,
+    "conf": "medium",
+    "note": "MERGED blob: two cream apartment blocks, 5-7 storeys, one with arched windows (x -296 S, x -266 S)"
+  },
+  "817": {
+    "floors": 4,
+    "wall": "#dcd6c8",
+    "shops": false,
+    "conf": "medium",
+    "note": "cream/grey 4-storey apartment with balconies (x -296 N)"
+  },
+  "819": {
+    "floors": 1,
+    "roof": "tin",
+    "roofCol": "#7d8285",
+    "wall": "#c9c3b5",
+    "shops": false,
+    "conf": "low",
+    "note": "tin-roofed sheds by a gated plot (x -296 N)"
+  },
+  "830": {
+    "floors": 3,
+    "wall": "#ebe8e1",
+    "shops": false,
+    "conf": "high",
+    "note": "white house with orange trim used as a pre-school, set back behind a garden (x -266 N)"
+  },
+  "917": {
+    "floors": 6,
+    "wall": "#e5d9bd",
+    "shops": false,
+    "conf": "medium",
+    "note": "cream apartment with stilt parking and dark vertical bands (x -266 S, x -236 S)"
+  },
+  "783": {
+    "floors": 4,
+    "wall": "#d3d8dc",
+    "shops": false,
+    "conf": "medium",
+    "note": "pale blue-grey/white 4-storey apartment with orange-trimmed gate pillars (x -236 N, x -206 N)"
+  },
+  "926": {
+    "floors": 3,
+    "wall": "#eee3e0",
+    "shops": false,
+    "conf": "high",
+    "note": "white 3-storey house with maroon bands and a red parapet (x -236 S, x -206 S)"
+  },
+  "838": {
+    "floors": 2,
+    "wall": "#cdc6ae",
+    "shops": false,
+    "conf": "high",
+    "note": "old weathered 2-storey concrete house in a gated compound (x -206 N)"
+  },
+  "771": {
+    "floors": 4,
+    "wall": "#d6b47f",
+    "shops": false,
+    "conf": "medium",
+    "note": "ochre apartment complex behind a gatehouse; floor count not fully visible through trees (x -145 N)"
+  },
+  "852": {
+    "floors": 1,
+    "wall": "#ece9e2",
+    "shops": false,
+    "conf": "medium",
+    "note": "gatehouse of the ochre apartment complex (x -145 N)"
+  },
+  "816": {
+    "floors": 1,
+    "roof": "tin",
+    "roofCol": "#7d8285",
+    "wall": "#b35a48",
+    "shops": false,
+    "conf": "high",
+    "note": "red single-storey house with a grey tin gable roof behind a red wall (x -115 N)"
+  },
+  "831": {
+    "floors": 2,
+    "wall": "#e6e0cf",
+    "shops": false,
+    "conf": "low",
+    "note": "cream house west of the red house, mostly hidden by trees (x -115 N)"
+  },
+  "789": {
+    "floors": 3,
+    "wall": "#e3e3dd",
+    "shops": false,
+    "conf": "medium",
+    "note": "large white institutional building behind a long blue-grey compound wall (x -85 N)"
+  },
+  "892": {
+    "floors": 3,
+    "wall": "#e8e3d6",
+    "shops": false,
+    "conf": "medium",
+    "note": "white/cream 3-storey house with a roof garden behind a wall (x -85 S, x -59 S)"
+  },
+  "845": {
+    "floors": 1,
+    "roof": "tin",
+    "roofCol": "#8a8d8c",
+    "wall": "#d9d4c6",
+    "shops": false,
+    "conf": "medium",
+    "note": "tin shed stall at the Baikuntha Rd corner (x -59 N)"
+  },
+  "846": {
+    "floors": 1,
+    "roof": "tin",
+    "roofCol": "#8a8d8c",
+    "wall": "#d9d4c6",
+    "shops": false,
+    "conf": "low",
+    "note": "tin shed stall east of the Baikuntha Rd corner (x -59 N)"
+  },
+  "889": {
+    "floors": 3,
+    "wall": "#d99fb3",
+    "shops": true,
+    "conf": "medium",
+    "note": "MERGED blob (x -15..44): pink 3-storey coaching centre with ground-floor shops, a yellow 2-storey house and others (x -4 S, x 27 S)"
+  },
+  "879": {
+    "floors": 1,
+    "wall": "#e2d6bc",
+    "shops": true,
+    "conf": "high",
+    "note": "single-storey row of shops with blue flex banners (x 27 S)"
+  },
+  "890": {
+    "floors": 3,
+    "wall": "#eceae5",
+    "shops": false,
+    "conf": "high",
+    "note": "white 3-storey house with maroon trim and a front stair (x 27 S, x 57 S)"
+  },
+  "887": {
+    "floors": 5,
+    "wall": "#6a85b3",
+    "shops": true,
+    "conf": "high",
+    "note": "blue-and-white 5-storey with ground-floor shops (x 57 S, x 88 S)"
+  },
+  "881": {
+    "floors": 4,
+    "wall": "#c8bead",
+    "shops": false,
+    "conf": "medium",
+    "note": "4-storey house with terrace gardens (x 88 S)"
+  },
+  "1450": {
+    "floors": 6,
+    "wall": "#e3d2a8",
+    "shops": false,
+    "conf": "medium",
+    "note": "east cream apartment block split out of 912 by data/footprint_fixes.json (x -266 S); same facts as 912"
+  },
+  "1453": {
+    "floors": 2,
+    "wall": "#e0c870",
+    "shops": false,
+    "conf": "low",
+    "note": "east lobe split out of 889: probably the yellow 2-storey house (x 27 S)"
+  },
+  "1455": {
+    "floors": 1,
+    "wall": "#e6cd72",
+    "shops": false,
+    "roof": "tin",
+    "style": "assam",
+    "conf": "low",
+    "note": "yellow single-storey Assam-type house with a tin roof, north side just west of 783 (x -236 N on Street View); south lobe split out of 775"
+  },
+  "787": {
+    "floors": 1,
+    "roof": "tin",
+    "wall": "#d9c27a",
+    "shops": false,
+    "conf": "low",
+    "note": "small shed just inside the red Baikuntha Rd wall of the field; Street View (pano O7OpOyLpLLFmj4JrMQhC-g) shows only low sheds and a tarp tent here, nothing tall"
+  },
+  "641": {
+    "floors": 1,
+    "roof": "tin",
+    "style": "assam",
+    "wall": "#d9c374",
+    "shops": false,
+    "conf": "medium",
+    "note": "yellow Assam-type house up on the bank behind the bamboo, east of the Railway Colony Rd fork (pano TM0yGJz9JxTDqlgqGfI_bQ heading 20, Mar 2026); was a seeded 5-storey"
+  }
+}

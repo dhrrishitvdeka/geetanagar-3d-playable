@@ -1,0 +1,483 @@
+{
+  "_about": "Mother Teresa Rd (Zoo-Narengi Rd) features from Hatigarh Chariali to past the mandir, from Google Street View (imagery Mar 2026, walked 2026-10-15). x = local metres east (same frame as geo.json). Lateral positions are given as a side (N/S/median) plus an offset rule, because the Street View camera coordinates on this stretch are offset ~8-13 m north of the true road (geo.json edges match Google satellite, checked by the lead), so absolute pano y values would misplace things. 'verified' = seen on a pano, x within ~5 m; 'estimated' = inferred, interpolated or not visible. Owner: streets session (mainroad.js, streetlife.js, streets.js read this file).",
+  "checked_panos_x": [
+    -499,
+    -485,
+    -469,
+    -440,
+    -410,
+    -380,
+    -350,
+    -290,
+    -230,
+    -170,
+    -110,
+    -50,
+    -24,
+    10,
+    47,
+    60,
+    70
+  ],
+  "median": {
+    "start_x": -470,
+    "start_status": "verified",
+    "start_note": "rounded nose ~25 m east of the Hatigarh island; a signal stands on it",
+    "end_x": 447,
+    "end_status": "estimated",
+    "end_note": "continuous to at least x = 110 (verified); beyond that not walked, so it runs to the end of the data",
+    "wide_from_x": -470,
+    "wide_to_x": -340,
+    "wide_half_m": 1.2,
+    "narrow_half_m": 0.7,
+    "width_status": "estimated",
+    "railing_note": "near the nose (x -470..-440) the median fence looked tan/bamboo-coloured; at the field (x -24) and mid-segment it is black. Modelled black throughout (estimated)."
+  },
+  "median_gaps": [],
+  "median_gaps_note": "No U-turn gaps were seen on any checked pano from x -470 to x 110, including opposite Geeta Nagar Rd (x ~ 62-71), which was checked looking across the median (verified absent).",
+  "junctions": [
+    {
+      "x": -518,
+      "side": "S",
+      "w": 5,
+      "status": "estimated",
+      "note": "from roads.json"
+    },
+    {
+      "x": -496,
+      "side": "N",
+      "w": 8,
+      "name": "Railway Colony Rd",
+      "status": "verified"
+    },
+    {
+      "x": -493,
+      "side": "S",
+      "w": 8,
+      "name": "road south from Hatigarh",
+      "status": "verified"
+    },
+    {
+      "x": -392,
+      "side": "N",
+      "w": 6,
+      "status": "estimated"
+    },
+    {
+      "x": -192,
+      "side": "S",
+      "w": 8,
+      "status": "estimated"
+    },
+    {
+      "x": -189,
+      "side": "N",
+      "w": 6,
+      "status": "estimated"
+    },
+    {
+      "x": -130,
+      "side": "S",
+      "w": 3,
+      "status": "estimated"
+    },
+    {
+      "x": -65,
+      "side": "N",
+      "w": 6,
+      "status": "estimated"
+    },
+    {
+      "x": -23,
+      "side": "S",
+      "w": 6.1,
+      "status": "estimated"
+    },
+    {
+      "x": 71,
+      "side": "S",
+      "w": 6,
+      "status": "estimated"
+    },
+    {
+      "x": 114,
+      "side": "N",
+      "w": 6.1,
+      "status": "estimated"
+    },
+    {
+      "x": 136,
+      "side": "S",
+      "w": 6,
+      "status": "estimated"
+    }
+  ],
+  "junctions_note": "Positions from the lane network ends (roads.json) within 22 m of the main road centreline; the two at Hatigarh were seen on Street View.",
+  "edges": {
+    "_kinds": "open = earth shoulder only; kerb = narrow black-white kerb + black railing; culvert = short painted-concrete culvert railing on the kerb; field = field frontage; mandir = stair apron, footpath with black railing and black-white kerb",
+    "N": [
+      {
+        "x0": -800,
+        "x1": -474,
+        "kind": "open",
+        "status": "verified"
+      },
+      {
+        "x0": -474,
+        "x1": -430,
+        "kind": "kerb",
+        "status": "estimated"
+      },
+      {
+        "x0": -430,
+        "x1": -400,
+        "kind": "culvert",
+        "status": "verified"
+      },
+      {
+        "x0": -400,
+        "x1": -395,
+        "kind": "kerb",
+        "status": "estimated"
+      },
+      {
+        "x0": -395,
+        "x1": -348,
+        "kind": "open",
+        "status": "verified"
+      },
+      {
+        "x0": -348,
+        "x1": -250,
+        "kind": "kerb",
+        "status": "verified"
+      },
+      {
+        "x0": -250,
+        "x1": -200,
+        "kind": "open",
+        "status": "verified"
+      },
+      {
+        "x0": -200,
+        "x1": -58,
+        "kind": "kerb",
+        "status": "verified"
+      },
+      {
+        "x0": -58,
+        "x1": 18,
+        "kind": "field",
+        "status": "verified"
+      },
+      {
+        "x0": 18,
+        "x1": 34,
+        "kind": "open",
+        "status": "verified",
+        "note": "carts and kiosks on the shoulder west of the mandir stairs"
+      },
+      {
+        "x0": 34,
+        "x1": 66,
+        "kind": "mandir",
+        "status": "verified"
+      },
+      {
+        "x0": 66,
+        "x1": 800,
+        "kind": "kerb",
+        "status": "verified",
+        "note": "verified to x ~ 110"
+      }
+    ],
+    "S": [
+      {
+        "x0": -800,
+        "x1": -474,
+        "kind": "open",
+        "status": "verified"
+      },
+      {
+        "x0": -474,
+        "x1": -170,
+        "kind": "kerb",
+        "status": "estimated",
+        "note": "striped kerb with railing seen at x -440, -410, -380; breaks at junctions"
+      },
+      {
+        "x0": -170,
+        "x1": -66,
+        "kind": "forecourt",
+        "status": "verified",
+        "note": "park front: no footpath or railing; bare dusty earth forecourt up to the park picket fence (y ~ -80..-86); panos 3_qRnWZanWudTCw74Lodrw, kEM0kEBZ4oUXOCakZBgK1g"
+      },
+      {
+        "x0": -66,
+        "x1": 800,
+        "kind": "kerb",
+        "status": "estimated",
+        "note": "striped kerb with railing seen at x -24 and 60; breaks at junctions"
+      }
+    ]
+  },
+  "street_lights": [
+    {
+      "x": -455,
+      "side": "N",
+      "type": "single_arm_pole",
+      "status": "verified"
+    },
+    {
+      "x": -270,
+      "side": "N",
+      "type": "single_arm_pole",
+      "status": "verified"
+    },
+    {
+      "x": -137,
+      "side": "median",
+      "type": "twin_arm",
+      "status": "estimated"
+    },
+    {
+      "x": -96,
+      "side": "median",
+      "type": "twin_arm",
+      "status": "estimated"
+    },
+    {
+      "x": -55,
+      "side": "median",
+      "type": "twin_arm",
+      "status": "verified"
+    },
+    {
+      "x": -14,
+      "side": "median",
+      "type": "twin_arm",
+      "status": "verified"
+    },
+    {
+      "x": 27,
+      "side": "median",
+      "type": "twin_arm",
+      "status": "estimated"
+    },
+    {
+      "x": 68,
+      "side": "median",
+      "type": "twin_arm",
+      "status": "estimated"
+    },
+    {
+      "x": 109,
+      "side": "median",
+      "type": "twin_arm",
+      "status": "estimated"
+    }
+  ],
+  "street_lights_note": "Twin-arm median lights were only seen around the field (spacing ~41 m); the others extend that spacing. West of x -180 no median lights were visible on the panos checked, only single-arm lights on the north poles.",
+  "high_mast": {
+    "x": 14,
+    "side": "N",
+    "status": "estimated",
+    "note": "brief says there is a high-mast light near the field; it was NOT visible on the panos at x -24 (looking N/NE) or x 47, so the position is a guess"
+  },
+  "signals": [
+    {
+      "x": -499.3,
+      "y": -62.8,
+      "type": "gantry",
+      "status": "verified",
+      "note": "yellow CCTV/signal gantry pole on the west corner of Railway Colony Rd, arm reaching east over the road; x,y fitted to the data frame"
+    },
+    {
+      "x": -490.4,
+      "y": -63.6,
+      "status": "verified",
+      "note": "NE corner of Hatigarh on a yellow pole"
+    },
+    {
+      "x": -468.8,
+      "side": "median",
+      "status": "verified",
+      "note": "on the median nose"
+    }
+  ],
+  "island": {
+    "x": -497,
+    "status": "verified",
+    "note": "centre of the Hatigarh junction, on the main centreline"
+  },
+  "stalls": [
+    {
+      "kind": "stall_row",
+      "x0": -489.3,
+      "y0": -60.2,
+      "dy": 2.45,
+      "n": 9,
+      "facing": "W",
+      "status": "verified",
+      "note": "tin-roof stalls along the east side of Railway Colony Rd; count and spacing estimated (pano shows 8-10); x follows the 7 m Railway Colony Rd east verge"
+    },
+    {
+      "kind": "kiosk",
+      "x": -501.0,
+      "y": -61.6,
+      "status": "verified",
+      "note": "yellow-fronted kiosk, NW corner of Hatigarh"
+    },
+    {
+      "kind": "cabinet",
+      "x": -500.6,
+      "y": -64.4,
+      "status": "verified",
+      "note": "grey electrical cabinet"
+    },
+    { "kind": "cabinet", "x": -502.0, "y": -63.6, "status": "verified", "note": "second grey electrical cabinet beside the first (pano 9Yn0U7qxM9dqWNLUej2-3g heading 330, Mar 2026)" },
+    {
+      "kind": "umbrella_stall",
+      "x": -440,
+      "side": "N",
+      "status": "verified",
+      "note": "small red stall under a red-white umbrella on the north shoulder"
+    },
+    {
+      "kind": "handcart",
+      "x": -29.5,
+      "side": "N",
+      "color": "#c0271f",
+      "status": "verified",
+      "note": "red box cart along the field railing"
+    },
+    {
+      "kind": "handcart",
+      "x": 36,
+      "side": "N",
+      "color": "#e3b51e",
+      "status": "verified",
+      "note": "yellow carts on the shoulder just west of the mandir stairs"
+    },
+    {
+      "kind": "handcart",
+      "x": 39.5,
+      "side": "N",
+      "color": "#e3b51e",
+      "status": "verified"
+    },
+    {
+      "kind": "tea_stall",
+      "x": -121,
+      "side": "S",
+      "status": "verified",
+      "note": "tin-roofed tea stall on the park forecourt (lead's Street View check); x within ~5 m"
+    },
+    {
+      "kind": "kiosk_blue",
+      "x": -116.5,
+      "side": "S",
+      "status": "verified",
+      "note": "small blue kiosk"
+    },
+    {
+      "kind": "kiosk_blue",
+      "x": -113.5,
+      "side": "S",
+      "status": "verified",
+      "note": "small blue kiosk"
+    },
+    {
+      "kind": "handcart",
+      "x": -110,
+      "side": "S",
+      "color": "#2f62b0",
+      "offset": "forecourt",
+      "status": "verified",
+      "note": "hand-carts at the west end of the forecourt; exact count estimated"
+    },
+    {
+      "kind": "handcart",
+      "x": -126,
+      "side": "S",
+      "color": "#c0271f",
+      "offset": "forecourt",
+      "status": "estimated"
+    }
+  ],
+  "bus_stops": [
+    {
+      "x": -57,
+      "y": -74,
+      "side": "S",
+      "status": "verified",
+      "name": "Geetanagar Bus Stand",
+      "note": "position from the Google Maps pin; the shelter's look (tiled roof on pillars) is estimated"
+    }
+  ],
+  "railway_colony_rd": {
+    "asphalt_w": 7.0,
+    "status": "verified",
+    "note": "asphalt ~7 m from the main road north (roads named Railway Colony Road plus the unnamed pieces x -515..-480, y -70..125); pano g05NzMkFPBU4xEBxv5OuGg heading 355"
+  },
+  "parked": [
+    {
+      "kind": "car",
+      "x": -150,
+      "side": "S",
+      "offset": "forecourt",
+      "status": "estimated",
+      "note": "cars parked on the park forecourt"
+    },
+    {
+      "kind": "car",
+      "x": -142,
+      "side": "S",
+      "offset": "forecourt",
+      "status": "estimated",
+      "note": "cars parked on the park forecourt"
+    },
+    {
+      "kind": "car",
+      "x": -96,
+      "side": "S",
+      "offset": "forecourt",
+      "status": "estimated",
+      "note": "cars parked on the park forecourt"
+    },
+    {
+      "kind": "car",
+      "x": -84,
+      "side": "S",
+      "offset": "forecourt",
+      "status": "estimated",
+      "note": "cars parked on the park forecourt"
+    }
+  ],
+  "forecourt_trees": [
+    {
+      "x": -160,
+      "side": "S",
+      "status": "estimated",
+      "note": "big trees on the park forecourt"
+    },
+    {
+      "x": -135,
+      "side": "S",
+      "status": "estimated",
+      "note": "big trees on the park forecourt"
+    },
+    {
+      "x": -100,
+      "side": "S",
+      "status": "estimated",
+      "note": "big trees on the park forecourt"
+    },
+    {
+      "x": -75,
+      "side": "S",
+      "status": "estimated",
+      "note": "big trees on the park forecourt"
+    }
+  ]
+}
