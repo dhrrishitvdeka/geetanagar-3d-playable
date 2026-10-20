@@ -1,4 +1,4 @@
-"""Rebuild the lane network from the road class raster in data/geo.json -> data/roads.json.
+"""Rebuild the lane network from the road class raster data/cls_src.png -> data/roads.json + data/cls.png.
 
 The original skeleton (geo.json "roads") broke every lane into 2-3 point fragments: the map's
 road-name text punched holes down the middle of lanes, so the skeleton split into parallel
@@ -20,7 +20,7 @@ from skimage.morphology import skeletonize, binary_closing, disk, remove_small_h
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 G = json.load(open(os.path.join(ROOT, 'data', 'geo.json')))
 X0, X1, Y0, Y1 = G['bounds']; RES = G['res']
-cls = np.array(Image.open(io.BytesIO(base64.b64decode(G['cls']))))
+cls = np.array(Image.open(os.path.join(ROOT, 'data', 'cls_src.png')))  # traced raster (the one geo.json used to embed)
 H, W = cls.shape
 to_xy = lambda j, i: (X0 + (i + 0.5) * RES, Y1 - (j + 0.5) * RES)
 
@@ -192,11 +192,11 @@ if len(sys.argv) > 1:
 # patched class raster: label-text holes inside lanes become road (so ground paint, grass and trees respect them)
 cls_fixed = cls.copy()
 cls_fixed[lanes_full & (cls == 0)] = 1
-buf = io.BytesIO(); Image.fromarray(cls_fixed.astype(np.uint8), 'L').save(buf, 'PNG', optimize=True)
+Image.fromarray(cls_fixed.astype(np.uint8), 'L').save(os.path.join(ROOT, 'data', 'cls.png'), 'PNG', optimize=True)  # served as its own file, decoded natively by geo.js
 print('class raster: filled', int((lanes_full & (cls == 0)).sum()), 'hole pixels')
 
 out = {'_about': 'Lane centrelines rebuilt from the road class raster by pipeline/roads.py (Mother Teresa Rd excluded; see GEO.main). w = carriageway width in metres from the distance transform. Names, where present, from OpenStreetMap (ODbL).',
-       'roads': roads, 'cls': base64.b64encode(buf.getvalue()).decode()}
+       'roads': roads}
 json.dump(out, open(os.path.join(ROOT, 'data', 'roads.json'), 'w'), separators=(',', ':'))
 ls = sorted(length([(0, 0)]) for _ in [0])
 print(f'{len(roads)} roads (was {len(G["roads"])}), total {sum(math.hypot(b[0]-a[0], b[1]-a[1]) for r in roads for a, b in zip(r["p"][:-1], r["p"][1:])):.0f} m, '

@@ -79,7 +79,7 @@ const HN = 2048, HEAD = new Int32Array(HN), NEXT = new Int32Array(1024), QOUT = 
 const HL = []; let qStamp = 0, HC = 3;
 const hk = (cx, cy) => ((cx * 73856093) ^ (cy * 19349663)) & (HN - 1);
 function rebuildHash() {
-  HEAD.fill(-1); HL.length = 0; const n = Math.min(ALL.length, NEXT.length);
+  HEAD.fill(-1); HL.length = 0; const n = Math.min(ALL.length, NEXT.length); // HL is a snapshot: ALL shifts when people are dropped mid-frame, the bucket indices must not
   for (let i = 0; i < n; i++) { const o = ALL[i]; HL.push(o); if (o.dead) continue; const h = hk(Math.floor(o.x / HC), Math.floor(o.y / HC)); NEXT[i] = HEAD[h]; HEAD[h] = i; }
 }
 function collect(x, y, r) { // fills QOUT with live NPCs near (x, y); returns the count (do not nest)
@@ -95,11 +95,12 @@ function makeNPC(id, name, role, x, y, heading, app, def, kind) {
   const n = { id, name, role, title: def.title, x, y, z: groundAt(x, y), heading, speed: 0, state: 'idle', behavior: def.behavior || 'idle', def, talking: false,
     kind, dead: false, hidden: false, real: false, slot: null, pick: 0, recipe: buildRecipe(app), rig: new Animator(), animDt: 0, hold: 0, qs: 0, vx: 0, vy: 0, vWalk: 1.3, vRun: 3.4, run: false, path: null, pi: 0, wait: 0, acc: 0, k: ALL.length,
     goto: null, anchor: def.anchor || null, tget: null, hasW: false, dist: 2, faceT: null, idleState: 'idle', talkCd: 0, greetCd: rnd(0, 20), flinchT: 0, slideX: 0, slideY: 0, bumpCd: 0, sayCd: rnd(3, 10), stuck: 0,
-    pathReq: false, pc: 0, partner: null, spot: null, t1: rnd(0, 5), t2: 0, _label: '', _pos: [x, y, 0], _head: new THREE.Vector3(), _hfn: null, _posFn: null, onPathEnd: null };
+    pathReq: false, pc: 0, partner: null, spot: null, t1: rnd(0, 5), t2: 0, _label: '', _ft: [0, 0], _pos: [x, y, 0], _head: new THREE.Vector3(), _hfn: null, _posFn: null, onPathEnd: null };
   n.hold = n.recipe.hold; n._hfn = () => n._head.set(n.x, n.z + 1.95 * n.recipe.s, -n.y);
   n._posFn = () => { n._pos[0] = n.x; n._pos[1] = n.y; n._pos[2] = n.z + 1; return n._pos; };
   setLabel(n); return n;
 }
+const aim = (n, x, y) => { const f = n._ft; f[0] = x; f[1] = y; return f; }; // per-NPC look-at point, rewritten in place (faceT is only ever read, never kept)
 const setLabel = n => { n._label = 'Talk to ' + n.name + (n.title ? ' (' + n.title + ')' : ''); };
 function reg(n) { if (n.def.talk !== false) register({ id: 'npc:' + n.id, pos: n._posFn, r: 2.2, label: () => n._label, kind: 'npc', onInteract: () => talkTo(n) }); }
 function addToWorld(n) { ALL.push(n); BYID.set(n.id, n); n.k = ALL.length; reg(n); }
@@ -183,7 +184,10 @@ function manageSpots() {
   for (const sp of SPOTS) {
     const d = Math.hypot(sp.x - P.x, sp.y - P.y), open = hour >= sp.h0 && hour < sp.h1;
     if (!sp.active && open && d < SPAWN_R) activateSpot(sp);
-    else if (sp.active && (!open || d > RECYCLE_R + 30)) { for (const n of sp.npcs.slice()) if (!n.talking) dropFromWorld(n); if (!sp.npcs.length) sp.active = false; }
+    else if (sp.active && (!open || d > RECYCLE_R + 30)) { // drop in order without copying: dropFromWorld splices n out of sp.npcs, so only step on when n stayed (talking)
+      const L = sp.npcs; for (let i = 0; i < L.length;) { const n = L[i]; if (!n.talking) dropFromWorld(n); if (L[i] === n) i++; }
+      if (!sp.npcs.length) sp.active = false;
+    }
   }
 }
 
@@ -258,7 +262,7 @@ function behave(n, dt) {
   switch (n.behavior) {
     case 'wander':
       if (n.pause > 0) { // stopped for a word with someone met on the way
-        n.pause -= dt; const o = n.mate; if (o && !o.dead) n.faceT = [o.x, o.y];
+        n.pause -= dt; const o = n.mate; if (o && !o.dead) n.faceT = aim(n, o.x, o.y);
         if (n.pause <= 0 || !o || o.dead) { n.pause = 0; n.idleState = 'idle'; n.faceT = null; n.mate = null; } else { n.t2 -= dt; if (n.t2 <= 0) { n.t2 = rnd(1.5, 3.5); n.idleState = n.idleState === 'talk' ? 'idle' : 'talk'; } }
         break;
       }
@@ -278,7 +282,7 @@ function behave(n, dt) {
     }
     case 'follow': {
       const t = n.tget && n.tget(); if (!t) break; const tx = Array.isArray(t) ? t[0] : t.x, ty = Array.isArray(t) ? t[1] : t.y, dx = n.x - tx, dy = n.y - ty, d = Math.hypot(dx, dy) || 1;
-      if (d > n.dist + 0.7) want(tx + dx / d * n.dist, ty + dy / d * n.dist, d > 10 ? n.vRun : Math.min(n.vRun * 0.6, 0.9 + (d - n.dist) * 0.6), true); else n.faceT = [tx, ty];
+      if (d > n.dist + 0.7) want(tx + dx / d * n.dist, ty + dy / d * n.dist, d > 10 ? n.vRun : Math.min(n.vRun * 0.6, 0.9 + (d - n.dist) * 0.6), true); else n.faceT = aim(n, tx, ty);
       break;
     }
     case 'play': {
@@ -298,7 +302,7 @@ function behave(n, dt) {
       break;
     }
     case 'chat': {
-      n.t1 -= dt; const o = n.partner; if (o && !o.dead) n.faceT = [o.x, o.y];
+      n.t1 -= dt; const o = n.partner; if (o && !o.dead) n.faceT = aim(n, o.x, o.y);
       if (n.t1 <= 0) { n.t1 = rnd(2.5, 6); n.idleState = n.idleState === 'talk' ? 'idle' : 'talk'; if (o && !o.dead) o.idleState = n.idleState === 'talk' ? 'idle' : 'talk'; if (n.idleState === 'talk' && P && Math.hypot(P.x - n.x, P.y - n.y) < 16 && chance(0.18)) say(n, pickOf(BANTER), 2200); }
       break;
     }
@@ -323,12 +327,13 @@ function unstick(n, dt, cheap) {
     if (n.goto) { n.goto.path = null; n.path = null; queuePath(n); } else { n.path = null; n.hasW = false; n.wait = rnd(0.5, 2); }
   }
 }
+const SLIDE = [0.6, -0.6, 1.2, -1.2];
 function locomote(n, dt, cheap) {
   let tvx = 0, tvy = 0, slow = 1;
   if (W.go) {
     const dx = W.x - n.x, dy = W.y - n.y, d = Math.hypot(dx, dy) || 1; let v = W.v; if (W.arrive) v = Math.min(v, d * 1.6 + 0.2);
     let ux = dx / d, uy = dy / d, ax = 0, ay = 0;
-    if (n.detourT > 0) { n.detourT -= dt; const c = Math.cos(n.detour), s = Math.sin(n.detour); [ux, uy] = [ux * c - uy * s, ux * s + uy * c]; } // unsticking: walk off at an angle for a moment
+    if (n.detourT > 0) { n.detourT -= dt; const c = Math.cos(n.detour), s = Math.sin(n.detour); const rx = ux * c - uy * s; uy = ux * s + uy * c; ux = rx; } // unsticking: walk off at an angle for a moment
     if (!cheap) {
       // look-ahead avoidance: people up to ~2.6 m ahead are passed on one side (keep left, as on Indian roads) instead of
       // being pushed into head-on; anyone closer than 1 m still pushes apart
@@ -363,7 +368,7 @@ function locomote(n, dt, cheap) {
       // blocked: slide along the obstacle, trying the axes and then directions rotated off the blocked one
       let ok = false;
       if (walkable(nx, n.y)) { ny = n.y; ok = true; } else if (walkable(n.x, ny)) { nx = n.x; ok = true; }
-      else for (const a of [0.6, -0.6, 1.2, -1.2]) { const c = Math.cos(a), s = Math.sin(a), qx = n.x + (n.vx * c - n.vy * s) * dt, qy = n.y + (n.vx * s + n.vy * c) * dt; if (walkable(qx, qy)) { nx = qx; ny = qy; ok = true; break; } }
+      else for (const a of SLIDE) { const c = Math.cos(a), s = Math.sin(a), qx = n.x + (n.vx * c - n.vy * s) * dt, qy = n.y + (n.vx * s + n.vy * c) * dt; if (walkable(qx, qy)) { nx = qx; ny = qy; ok = true; break; } }
       if (!ok) { nx = n.x; ny = n.y; n.vx *= 0.3; n.vy *= 0.3; sp = 0; }
     }
     const moved = Math.hypot(nx - n.x, ny - n.y);

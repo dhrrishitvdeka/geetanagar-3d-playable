@@ -1,8 +1,8 @@
 import * as THREE from 'three';
-import { scene } from '../core/context.js';
 import { GEO, MANDIR, hAt, rng } from '../core/geo.js';
 import { mergeAdd, normalsOf, railing, resample, strip } from './geom.js';
 import { M } from './materials.js';
+import { cellInstances } from '../render/sectored.js';
 import { buildFieldEdge } from './road/fieldedge.js';
 import RF from '../../data/road_features.json'; // surveyed positions: median, gaps, edges, lights (see _about)
 
@@ -122,10 +122,10 @@ function buildMain() {
   const dm = new THREE.Object3D(), bg = new THREE.IcosahedronGeometry(0.5, 2), pp = bg.attributes.position;
   for (let k = 0; k < pp.count; k++) { const f = 0.75 + 0.5 * Math.abs(Math.sin(pp.getX(k) * 9.1 + pp.getY(k) * 7.3 + pp.getZ(k) * 5.7)); pp.setXYZ(k, pp.getX(k) * f, pp.getY(k) * f, pp.getZ(k) * f); }
   bg.computeVertexNormals();
-  const pink = new THREE.InstancedMesh(bg, new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.95 }), bush.length);
   const GC = ['#3f6a2a', '#4f7a34', '#56803a', '#5d8a3b', '#476f2e', '#6b8f3f'].map(c => new THREE.Color(c)), PC = ['#b4527e', '#c2658f', '#a04a72', '#cf7fa4'].map(c => new THREE.Color(c));
-  bush.forEach(([x, y, m, pk], i) => { const sz = 0.22 + r() * 0.28; dm.position.set(x, hAt(x, y) + MED_H + 0.22 * sz + 0.05, -y); dm.scale.set(sz * (0.9 + r() * 0.5), sz * (0.6 + r() * 0.5), sz * Math.min(1, m)); dm.rotation.set(r() * 0.4, r() * 6, r() * 0.4); dm.updateMatrix(); pink.setMatrixAt(i, dm.matrix); pink.setColorAt(i, (pk ? PC : GC)[Math.floor(r() * (pk ? PC : GC).length)]); });
-  pink.castShadow = true; pink.receiveShadow = true; scene.add(pink);
+  const shrubs = bush.map(([x, y, m, pk]) => { const sz = 0.22 + r() * 0.28; dm.position.set(x, hAt(x, y) + MED_H + 0.22 * sz + 0.05, -y); dm.scale.set(sz * (0.9 + r() * 0.5), sz * (0.6 + r() * 0.5), sz * Math.min(1, m)); dm.rotation.set(r() * 0.4, r() * 6, r() * 0.4); dm.updateMatrix(); return [x, y, dm.matrix.clone(), (pk ? PC : GC)[Math.floor(r() * (pk ? PC : GC).length)]]; });
+  // one instanced mesh per 60 m of median, so the rows out of view and outside the shadow box are culled
+  for (const im of cellInstances(bg, new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.95 }), shrubs)) { im.castShadow = true; im.receiveShadow = true; }
   buildMedianLamps(lamps);
 }
 // median street lights: tapered steel pole with twin curved arms (seen on Street View at the field)

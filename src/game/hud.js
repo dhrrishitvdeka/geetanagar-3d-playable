@@ -151,7 +151,7 @@ function updateStatus(dt, now) {
     c.tick = buffTick;
     if (c.sec !== sec) { c.sec = sec; c.txt.textContent = sec + 's'; }
   }
-  for (const [k, c] of buffChips) if (c.tick !== buffTick) { c.el.remove(); buffChips.delete(k); }
+  if (buffChips.size) for (const [k, c] of buffChips) if (c.tick !== buffTick) { c.el.remove(); buffChips.delete(k); }
   let bag = 0; for (const k in s.inv) bag += s.inv[k];
   if (bag !== lastBag) { lastBag = bag; bagEl.textContent = 'Bag ' + bag; }
   // riding readout
@@ -264,11 +264,11 @@ function setLoading(text) {
 }
 
 // ---------- objective marker ----------
-let obj = null, objH = 2, objHAt = -1e9, objKey = -1, objOff = null, objAng = 1e9, objX = -1e9, objY = -1e9;
+let obj = null, objH = 2, objHAt = -1e9, objKey = -1, objOff = null, objAng = 1e9, objX = -1e9, objY = -1e9, objShown = false;
 function setObjectiveTarget(t) {
   if (!inited) initHUD(); if (!inited) return;
   if (!t || !isFinite(t.x) || !isFinite(t.y)) { obj = null; objEl.hidden = true; return; }
-  obj = { x: t.x, y: t.y, label: t.label || '' }; objHAt = -1e9; objKey = -1; objOff = null; objEl.hidden = false; objEl.style.visibility = 'hidden';
+  obj = { x: t.x, y: t.y, label: t.label || '' }; objHAt = -1e9; objKey = -1; objOff = null; objEl.hidden = false; objEl.style.visibility = 'hidden'; objShown = false;
 }
 function updateObjective(p, now) {
   if (now - objHAt > 500) { objHAt = now; try { objH = groundAt(obj.x, obj.y) + 2; } catch (e) { objH = 2; } }
@@ -293,7 +293,7 @@ function updateObjective(p, now) {
   if (off) { const deg = Math.round(ang * 57.2958); if (deg !== objAng) { objAng = deg; objArrow.style.transform = 'rotate(' + deg + 'deg) translateX(26px)'; } }
   const rx = Math.round(sx), ry = Math.round(sy);
   if (rx !== objX || ry !== objY) { objX = rx; objY = ry; objEl.style.transform = 'translate3d(' + rx + 'px,' + ry + 'px,0)'; }
-  objEl.style.visibility = 'visible';
+  if (!objShown) { objShown = true; objEl.style.visibility = 'visible'; } // set once per target, not every frame
 }
 
 // ---------- speech bubbles ----------
@@ -304,7 +304,7 @@ function bubble(key, getPos, text, ms = 3500) {
   if (!inited) initHUD(); if (!inited) return;
   if (!text || typeof getPos !== 'function') { removeBubble(key); return; }
   let b = bubs.get(key);
-  if (!b) { b = { key, el: el('div', 'g-bub'), t: el('span'), getPos, until: 0, show: false, d: 0, x: 0, y: 0, sx: -1e9, sy: -1e9, out: false }; b.el.appendChild(b.t); b.el.style.visibility = 'hidden'; bubsEl.appendChild(b.el); bubs.set(key, b); bubArr.push(b); }
+  if (!b) { b = { key, el: el('div', 'g-bub'), t: el('span'), getPos, until: 0, show: false, vis: false, d: 0, x: 0, y: 0, sx: -1e9, sy: -1e9, out: false }; b.el.appendChild(b.t); b.el.style.visibility = 'hidden'; bubsEl.appendChild(b.el); bubs.set(key, b); bubArr.push(b); }
   b.getPos = getPos; b.t.textContent = String(text).slice(0, 140); b.until = performance.now() + (ms > 0 ? ms : 3500);
   if (b.out) { b.out = false; b.el.classList.remove('out'); }
 }
@@ -334,8 +334,8 @@ function updateBubbles(now) {
   const n = Math.min(bubScratch.length, BUB_MAX);
   for (let i = 0; i < n; i++) bubScratch[i].show = true;
   for (let i = 0; i < bubArr.length; i++) {
-    const b = bubArr[i], vis = b.el.style.visibility === 'visible';
-    if (b.show !== vis) b.el.style.visibility = b.show ? 'visible' : 'hidden';
+    const b = bubArr[i];
+    if (b.show !== b.vis) { b.vis = b.show; b.el.style.visibility = b.show ? 'visible' : 'hidden'; } // cached: no style read per bubble per frame
     if (!b.show) continue;
     const rx = Math.round(b.x), ry = Math.round(b.y);
     if (rx !== b.sx || ry !== b.sy) { b.sx = rx; b.sy = ry; b.el.style.transform = 'translate3d(' + rx + 'px,' + ry + 'px,0) translate(-50%,-100%)'; }

@@ -79,6 +79,9 @@ let spawn = { x: 0, y: 0, heading: Math.PI / 2 };
   safe('initNPCs', initNPCs); safe('initWorldObjects', initWorldObjects); safe('initQuests', initQuests);
   safe('updateNearTrees', () => updateNearTrees(true));
   { const p = getPlayer(); spawn = { x: p.x, y: p.y, heading: p.heading }; } // where a new game starts: the field, as the explorer does
+  // compile every material in the scene now, behind the loading screen, instead of stalling the first frames that see it
+  setLoading('Preparing shaders…');
+  const tc = performance.now(); try { await renderer.compileAsync(scene, camera); } catch (err) { /* materials compile on first use instead */ } BOOT_MS.compileShaders = Math.round(performance.now() - tc);
   setLoading(null);
   ready = true;
   showMenu('title');

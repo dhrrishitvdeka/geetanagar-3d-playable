@@ -14,6 +14,7 @@ import { BUILDERS, NVAR, materials } from './palms.js';
 import { VEG_U, patchVeg, tickVeg, vegDepth } from './wind.js';
 import { noiseAt } from './noise.js';
 import { FOREST_POLY, inForestPoly, inMandirClear, onUntracedRoad, quality } from './zones.js';
+import { SectorSet } from '../render/sectored.js';
 
 // ---------- trees ----------
 // Broadleaf trees (EZ-Tree models standing in for rain tree, mango, jackfruit and the pink-flowering median trees):
@@ -36,6 +37,10 @@ const VARIANTS = {};
 let farTrunk = null; // kept for main.js: truthy once the trees exist
 let nearSets = {}, lastNearAt = null, lastQ = null;
 const imps = {}, plantSets = {};
+// yard plants reach 2 km out, so they get fewer, wider slices than the near trees (fewer draw calls)
+const PLANT_SLICES = { n: 6, inner: 30 };
+// traced-area trees bucketed by map cell (built on first use), so picking the near models doesn't scan every tree
+const NEAR_CELL = 32, nearGrid = new Map();
 let lastPlantAt = null;
 
 const mainPts = GEO.main;
@@ -129,11 +134,11 @@ function buildTreeMeshes() {
         const mat = leaf
           ? patchVeg(new THREE.MeshStandardMaterial({ map: leafTex[v], alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.78 }), { ...wind, flutter: 0.05, foliage: { center, radius, mix: 0.65, ao: 0.45 }, upNormals: true })
           : patchVeg(new THREE.MeshStandardMaterial({ map: ASSET.bark, normalMap: ASSET.barkN, color: bark, roughness: 0.95 }), wind);
-        const im = new THREE.InstancedMesh(p.geo, mat, Math.max(...Object.values(QP).map(q => q.cap))); im.count = 0; im.castShadow = true; im.receiveShadow = true; im.frustumCulled = false;
+        // sliced round the camera so the slices out of view are culled (leaf slices carry the per-tree tint)
+        const im = new SectorSet(p.geo, mat, Math.max(...Object.values(QP).map(q => q.cap)), { colors: leaf }); im.castShadow = true; im.receiveShadow = true;
         im.customDepthMaterial = leaf ? vegDepth(leafTex[v], { ...wind, flutter: 0.05 }) : vegDepth(null, wind, 0);
-        im.userData.leaf = leaf;
-        if (leaf) im.setColorAt(0, new THREE.Color(1, 1, 1)); // allocate instanceColor for the per-tree leaf tint
-        scene.add(im); return im;
+        im.leaf = leaf;
+        return im;
       });
       // impostor atlas, baked from the same model and materials
       const bake = bakeImpostor(mp, mp.parts.map(p => isLeaf(p) ? { map: leafTex[v], leaf: true } : { map: ASSET.bark, tint: bark, leaf: false }));
@@ -158,9 +163,9 @@ function buildTreeMeshes() {
     const set = plantSets[sp + v] = {};
     for (const [lod, detail] of [['near', true], ['far', false]]) {
       const g = BUILDERS[sp](seed, detail);
-      const tr = new THREE.InstancedMesh(g.trunk, M[sp].trunk, n), lf = new THREE.InstancedMesh(g.leaf, M[sp].leaf, n);
+      const tr = new SectorSet(g.trunk, M[sp].trunk, n, PLANT_SLICES), lf = new SectorSet(g.leaf, M[sp].leaf, n, PLANT_SLICES);
       lf.customDepthMaterial = M[sp].depth;
-      for (const m of [tr, lf]) { m.count = 0; m.frustumCulled = false; m.castShadow = lod === 'near' || sp === 'coconut'; m.receiveShadow = true; scene.add(m); }
+      for (const m of [tr, lf]) { m.castShadow = lod === 'near' || sp === 'coconut'; m.receiveShadow = true; }
       set[lod] = [tr, lf];
     }
   }
@@ -189,37 +194,43 @@ function updateNearTrees(force) {
   // broadleaf near models
   let effR = P.nearR;
   const cand = {}; for (const v in nearSets) cand[v] = [];
-  for (let i = 0; i < TREES.length; i++) {
-    const t = TREES[i]; if (t.outer || !cand[t.model]) continue;
-    const d = Math.hypot(t.x - cx, t.y - cy, t.h + t.s * 0.5 - cz);
-    if (d < P.nearR + 8) cand[t.model].push([d, i]);
+  // only the grid cells within reach: the 3D distance is never shorter than the map distance
+  const R = P.nearR + 8, g0 = Math.floor((cx - R) / NEAR_CELL), g1 = Math.floor((cx + R) / NEAR_CELL), h0 = Math.floor((cy - R) / NEAR_CELL), h1 = Math.floor((cy + R) / NEAR_CELL);
+  if (!nearGrid.size) for (let i = 0; i < TREES.length; i++) { const t = TREES[i]; if (t.outer) continue; const k = Math.floor(t.x / NEAR_CELL) * 65536 + Math.floor(t.y / NEAR_CELL); let c = nearGrid.get(k); if (!c) nearGrid.set(k, c = []); c.push(i); }
+  for (let gx = g0; gx <= g1; gx++) for (let gy = h0; gy <= h1; gy++) {
+    const cell = nearGrid.get(gx * 65536 + gy); if (!cell) continue;
+    for (const i of cell) {
+      const t = TREES[i]; if (!cand[t.model]) continue;
+      const d = Math.hypot(t.x - cx, t.y - cy, t.h + t.s * 0.5 - cz);
+      if (d < R) cand[t.model].push([d, i]);
+    }
   }
   for (const v in nearSets) {
-    const all = cand[v].sort((a, b) => a[0] - b[0]), list = all.slice(0, P.cap), mp = VARIANTS[v];
+    const all = cand[v].sort((a, b) => a[0] - b[0] || a[1] - b[1]), list = all.slice(0, P.cap), mp = VARIANTS[v];
     if (all.length > P.cap) effR = Math.min(effR, list.length ? list[list.length - 1][0] : 0);
-    list.forEach(([, i], k) => {
-      const t = TREES[i], sc = (t.s * 1.25) / mp.h;
+    const sets = nearSets[v]; for (const im of sets) im.begin(cx, cy);
+    for (const [, i] of list) {
+      const t = TREES[i], sc = (t.s * 1.25) / mp.h, s = sets[0].slot(t.x, t.y);
       dm.position.set(t.x, t.h - 0.25, -t.y); dm.rotation.set(0, t.yaw, 0); dm.scale.set(sc * t.sx, sc * t.sy, sc * t.sx); dm.updateMatrix();
-      for (const im of nearSets[v]) { im.setMatrixAt(k, dm.matrix); if (im.userData.leaf) im.setColorAt(k, t.tint); }
-    });
-    for (const im of nearSets[v]) { im.count = list.length; im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; }
+      for (const im of sets) im.add(s, dm.matrix, im.leaf ? t.tint : null);
+    }
+    for (const im of sets) im.end();
   }
   // impostors take over completely beyond uNearR; the selection above stays valid until the camera moves 7 m
   VEG_U.uNearR.value = Math.max(0, effR - 8); VEG_U.uFadeW.value = Math.min(14, Math.max(4, effR * 0.18));
   // yard plants
   if (force || !lastPlantAt || Math.hypot(cx - lastPlantAt[0], cy - lastPlantAt[1], cz - lastPlantAt[2]) > 12) {
     lastPlantAt = [cx, cy, cz];
-    const cnt = {};
+    for (const id in plantSets) for (const lod of ['near', 'far']) for (const m of plantSets[id][lod]) m.begin(cx, cy);
     for (const p of PLANTS) {
       const d = Math.hypot(p.x - cx, p.y - cy, p.h + 4 - cz);
       if (d > P.plantFar) continue;
       const set = plantSets[p.sp + p.v]; if (!set) continue;
-      const lod = d < P.plantR ? 'near' : 'far', key = p.sp + p.v + lod, k = cnt[key] = (cnt[key] || 0);
-      cnt[key]++;
+      const pair = set[d < P.plantR ? 'near' : 'far'], s = pair[0].slot(p.x, p.y);
       dm.position.set(p.x, p.h - 0.1, -p.y); dm.rotation.set(0, p.yaw, 0); dm.scale.setScalar(p.s); dm.updateMatrix();
-      for (const m of set[lod]) m.setMatrixAt(k, dm.matrix);
+      for (const m of pair) m.add(s, dm.matrix);
     }
-    for (const id in plantSets) for (const lod of ['near', 'far']) for (const m of plantSets[id][lod]) { m.count = cnt[id + lod] || 0; m.instanceMatrix.needsUpdate = true; }
+    for (const id in plantSets) for (const lod of ['near', 'far']) for (const m of plantSets[id][lod]) m.end();
   }
 }
 

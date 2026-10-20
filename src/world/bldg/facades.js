@@ -7,7 +7,10 @@
 import * as THREE from 'three';
 import { rng } from '../../core/geo.js';
 import { QUALITY } from '../../render/quality.js';
-import { Layers, canvas, fbm, normalFromHeight, tex } from './tex.js';
+import { cacheGet, cacheLater, texKey } from '../../render/texcache.js';
+import { Layers, canvas, fbm, normalFromHeight, planesOk, tex, texturesFromPlanes } from './tex.js';
+import SRC_FACADES from './facades.js?raw'; // source text of the drawing code, for the texture cache key
+import SRC_TEX from './tex.js?raw';
 
 export const BAY = 3.2, FLOOR = 3.1, CELL = 512;
 const SZ = { low: 512, medium: 768, high: 1024 }[QUALITY], K = SZ / 1024; // facade set size in px and scale from layout units
@@ -210,6 +213,7 @@ function paintSlab(seed) {
   const d = L.gc.getImageData(0, 0, 512, 512);
   for (let y = 0; y < 512; y++) for (let x = 0; x < 512; x++) { const i = (y * 512 + x) * 4, v = n(x, y), k = 0.62 + v * 0.55 + (r() - 0.5) * 0.08; const moss = Math.max(0, 0.45 - v) * 0.5; d.data[i] *= k * (1 - moss * 0.3); d.data[i + 1] *= k * (1 - moss * 0.15); d.data[i + 2] *= k * (1 - moss * 0.45); }
   L.gc.putImageData(d, 0, 0);
+  if (L.keep) L.keep.col = d.data;
   return L;
 }
 function paintTin(seed) {
@@ -223,6 +227,7 @@ function paintTin(seed) {
     hd.data[i] = hd.data[i + 1] = hd.data[i + 2] = 128 + wv * 100; hd.data[i + 3] = 255;
   }
   L.gc.putImageData(d, 0, 0); L.gh.putImageData(hd, 0, 0);
+  if (L.keep) L.keep.col = d.data;
   L.rect(0, 0, 256, 256, { p: 1, r: 0.55 });
   return L;
 }
@@ -272,29 +277,55 @@ function patchFacade(m, { grime = 1, paintMask = true } = {}) {
   m.customProgramCacheKey = () => 'geetFacade' + grime + paintMask;
   return m;
 }
-function facadeMat(L, normalStrength, opts) {
-  const t = L.textures(normalStrength);
+function facadeMat(t, opts) {
   const m = new THREE.MeshStandardMaterial({ map: t.map, normalMap: t.normal, roughnessMap: t.mr, roughness: 1, metalness: 0, vertexColors: true, side: THREE.DoubleSide });
   m.normalScale.set(1, 1);
   return patchFacade(m, opts);
 }
 
+// ---------- texture cache ----------
+// The six texture sets (about 2 s of drawing at High) are restored from IndexedDB when an earlier run stored them. The key covers
+// this file, tex.js, the rng source, the preset and the browser (render/texcache.js). Top-level await because facadeMaterials()
+// is synchronous and the read has to be done before it runs.
+const SETS = ['slab', 'tin', 'rcc', 'slide', 'assam', 'blank'];
+const BUILD = { // name -> [painter, normal strength]; slab and tin first, as the drawing has always run
+  slab: [() => paintSlab(41), 1.5], tin: [() => paintTin(43), 3],
+  rcc: [() => paintRCC(11), 3], slide: [() => paintSlide(13), 3], assam: [() => paintAssam(17), 3], blank: [() => paintBlank(19), 2.5],
+};
+const KEY = texKey(`facades:${QUALITY}`, [SRC_FACADES, SRC_TEX, rng.toString(), QUALITY, SZ]);
+const T_READ = performance.now();
+let CACHED = await cacheGet(KEY);
+const READ_MS = performance.now() - T_READ;
+if (CACHED && !SETS.every(n => planesOk(CACHED[n]))) CACHED = null;
+
 let FACADE = null;
 export function facadeMaterials() {
   if (FACADE) return FACADE;
   const t0 = performance.now();
-  const slab = paintSlab(41).textures(1.5), tin = paintTin(43).textures(3);
+  let T = null;
+  if (CACHED) { try { T = {}; for (const n of SETS) T[n] = texturesFromPlanes(CACHED[n]); } catch (e) { T = null; } } // any failure: draw everything as before
+  const hit = !!T; CACHED = null;
+  if (!T) {
+    T = {}; const built = {};
+    for (const n of SETS) { const [paint, strength] = BUILD[n]; built[n] = paint(); T[n] = built[n].textures(strength); }
+    cacheLater(KEY, async () => { // runs when idle, one set per task; any set that is not fully opaque skips the whole entry
+      const out = {};
+      for (const n of SETS) { out[n] = built[n].capture(); if (!out[n]) return null; await new Promise(r => setTimeout(r, 0)); }
+      return out;
+    });
+  }
+  const { slab, tin } = T;
   FACADE = {
-    rcc: facadeMat(paintRCC(11), 3),
-    slide: facadeMat(paintSlide(13), 3),
-    assam: facadeMat(paintAssam(17), 3),
-    blank: facadeMat(paintBlank(19), 2.5),
+    rcc: facadeMat(T.rcc),
+    slide: facadeMat(T.slide),
+    assam: facadeMat(T.assam),
+    blank: facadeMat(T.blank),
     roof: new THREE.MeshStandardMaterial({ map: slab.map, normalMap: slab.normal, vertexColors: true, roughness: 0.95, side: THREE.DoubleSide }),
     tin: new THREE.MeshStandardMaterial({ map: tin.map, normalMap: tin.normal, vertexColors: true, roughness: 0.55, metalness: 0.35, side: THREE.DoubleSide }),
     trim: patchFacade(new THREE.MeshStandardMaterial({ map: slab.map, vertexColors: true, roughness: 0.92 }), { grime: 1, paintMask: false }),
     rail: new THREE.MeshStandardMaterial({ map: railingTexture(), vertexColors: true, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.5, metalness: 0.4 }),
   };
-  FACADE.ms = performance.now() - t0;
-  console.info(`facades: ${SZ} px sets, ${FACADE.ms.toFixed(0)} ms`);
+  FACADE.ms = performance.now() - t0 + (hit ? READ_MS : 0);
+  console.info(`facades: ${SZ} px sets, ${hit ? 'from cache, ' : ''}${FACADE.ms.toFixed(0)} ms`);
   return FACADE;
 }

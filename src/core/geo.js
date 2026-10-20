@@ -1,28 +1,40 @@
 import * as THREE from 'three';
 
 import geoUrl from '../../data/geo.json?url';
-const GEO = await (await fetch(geoUrl)).json();
 // lane network rebuilt by pipeline/roads.py (clean centrelines + measured widths); the original
 // skeleton fragments stay available as GEO.rawRoads
 import roadsUrl from '../../data/roads.json?url';
-GEO.rawRoads = GEO.roads;
-{
-  const R = await (await fetch(roadsUrl)).json();
-  GEO.roads = R.roads;
-  if (R.cls) GEO.cls = R.cls; // class raster with the lane text holes filled
-}
 // curated landmarks checked against Google Maps pins (data/landmarks.json), added to the traced labels
 import lmUrl from '../../data/landmarks.json?url';
-{
-  const LM = await (await fetch(lmUrl)).json();
-  for (const it of LM.items) if (!GEO.labels.some(l => l.t === it.t)) GEO.labels.push({ t: it.t, x: it.x, y: it.y, k: it.k });
-  for (const [t, c] of Object.entries(LM._corrections || {})) { const l = GEO.labels.find(l => l.t === t); if (l) { l.x = c.x; l.y = c.y; } }
-}
 // footprint patch from pipeline/footprints.py: split blobs and non-buildings. Existing indices never move: split parts are
 // appended at the end, skipped entries keep their slot with an empty polygon (buildings.js ignores p.length < 3)
 import fixUrl from '../../data/footprint_fixes.json?url';
+// Real elevation from Copernicus GLO-30 (data/terrain.json, built by pipeline/terrain_dem.py): uint16 decimetres above
+// Mother Teresa Rd on the same 5 m grid. Falls back to the old hillshade estimate in geo.json (uint8 quarter-metres).
+import terrainUrl from '../../data/terrain.json?url';
+// class raster (red channel = class id): its own PNG, decoded natively. createImageBitmap, not img.decode(): decode() never
+// settles in a hidden/background tab; the options keep the class ids exact (no colour management, no alpha premultiply)
+import clsUrl from '../../data/cls.png?url';
+
+// every fetch starts now, so the awaits below only wait for the slowest one instead of adding up
+const getJson = u => fetch(u).then(r => r.json());
+const geoP = getJson(geoUrl), roadsP = getJson(roadsUrl), lmP = getJson(lmUrl), fixP = getJson(fixUrl);
+const terrainP = fetch(terrainUrl).then(r => (r.ok ? r.json() : null)).catch(() => null);
+const clsP = fetch(clsUrl).then(r => r.blob()).then(b => createImageBitmap(b, { colorSpaceConversion: 'none', premultiplyAlpha: 'none' }));
+
+const GEO = await geoP;
+GEO.rawRoads = GEO.roads;
 {
-  const F = await (await fetch(fixUrl)).json(), B = GEO.buildings;
+  const R = await roadsP;
+  GEO.roads = R.roads;
+}
+{
+  const LM = await lmP;
+  for (const it of LM.items) if (!GEO.labels.some(l => l.t === it.t)) GEO.labels.push({ t: it.t, x: it.x, y: it.y, k: it.k });
+  for (const [t, c] of Object.entries(LM._corrections || {})) { const l = GEO.labels.find(l => l.t === t); if (l) { l.x = c.x; l.y = c.y; } }
+}
+{
+  const F = await fixP, B = GEO.buildings;
   for (const [i, f] of Object.entries(F.replace)) if (B[i]) Object.assign(B[i], { p: f.p, a: f.a, c: f.c, k: f.k, d: f.d });
   for (const f of F.append) B.push({ p: f.p, a: f.a, c: f.c, k: f.k, d: f.d });
   for (const i of Object.keys(F.skip)) if (B[i]) B[i].p = [];
@@ -32,10 +44,7 @@ function rng(seed) { let a = seed | 0; return () => { a = a + 0x6D2B79F5 | 0; le
 const hash2 = (x, y) => { const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); };
 
 // ---------- terrain heights ----------
-// Real elevation from Copernicus GLO-30 (data/terrain.json, built by pipeline/terrain_dem.py): uint16 decimetres above
-// Mother Teresa Rd on the same 5 m grid. Falls back to the old hillshade estimate in geo.json (uint8 quarter-metres).
-import terrainUrl from '../../data/terrain.json?url';
-const TERRAIN = await fetch(terrainUrl).then(r => (r.ok ? r.json() : null)).catch(() => null);
+const TERRAIN = await terrainP;
 const HG = TERRAIN ? TERRAIN.hgrid : GEO.hgrid;
 const hbytes = Uint8Array.from(atob(HG.b64), c => c.charCodeAt(0));
 const HV = HG.enc ? Float32Array.from(new Uint16Array(hbytes.buffer), v => v / 10) : Float32Array.from(hbytes, v => v / 4); // metres
@@ -62,11 +71,9 @@ function hAtBase(x, y) { // bilinear, metres above the plain
 
 // ---------- class map (0 yard, 1 road, 2 building, 3 shop/commercial, 4 park, 5 field) ----------
 const [CX0, CX1, CY0, CY1] = GEO.bounds, CRES = GEO.res, CW = GEO.w, CH = GEO.h;
-// class raster: decoded once from the embedded PNG (red channel = class id)
+// class raster: read back once from the decoded bitmap
 const CLS = await (async () => {
-  // createImageBitmap, not img.decode(): decode() never settles in a hidden/background tab
-  const bytes = Uint8Array.from(atob(GEO.cls), c => c.charCodeAt(0));
-  const img = await createImageBitmap(new Blob([bytes], { type: 'image/png' }), { colorSpaceConversion: 'none', premultiplyAlpha: 'none' }); // keep class ids exact
+  const img = await clsP;
   const c = document.createElement('canvas'); c.width = CW; c.height = CH;
   const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(img, 0, 0);
   const d = g.getImageData(0, 0, CW, CH).data, out = new Uint8Array(CW * CH);

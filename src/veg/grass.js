@@ -53,6 +53,7 @@ function buildGrass() {
 // bare-earth propensity per class, as in terrain.js paintGround()
 const BARE = { 0: 0.30, 4: 0.05, 9: 0.2 };
 const ss = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+const _dm = new THREE.Object3D(), _col = new THREE.Color(), APRON = [[1.1, 0], [-1.1, 0], [0, 1.1], [0, -1.1]]; // scratch for the rebuild (no per-rebuild or per-tuft allocation)
 function updateGrass() {
   if (!grassIM) return;
   if (mode !== 'walk') { grassIM.count = 0; return; }
@@ -61,7 +62,7 @@ function updateGrass() {
   if (lastGrassAt && Math.hypot(player.x - lastGrassAt[0], player.y - lastGrassAt[1]) < 5) return;
   lastGrassAt = [player.x, player.y];
   const { step, R, max } = QG[q];
-  const dm = new THREE.Object3D(), col = new THREE.Color(); let k = 0;
+  const dm = _dm, col = _col; let k = 0;
   for (let gx = Math.floor((player.x - R) / step); gx <= (player.x + R) / step; gx++) for (let gy = Math.floor((player.y - R) / step); gy <= (player.y + R) / step; gy++) {
     if (k >= max) break;
     const x = (gx + hash2(gx, gy)) * step, y = (gy + hash2(gy, gx)) * step;
@@ -70,7 +71,7 @@ function updateGrass() {
     const h = hAt(x, y), forest = h > 4 || inForestPoly(x, y);
     let bare = forest ? 0.12 : BARE[c];
     // skip concrete aprons next to buildings
-    if (c === 0 && !forest) { let nb = false; for (const [dx, dy] of [[1.1, 0], [-1.1, 0], [0, 1.1], [0, -1.1]]) { const kk = clsAt(x + dx, y + dy); if (kk === 2 || kk === 3) { nb = true; break; } } if (nb) continue; }
+    if (c === 0 && !forest) { let nb = false; for (let a = 0; a < 4; a++) { const kk = clsAt(x + APRON[a][0], y + APRON[a][1]); if (kk === 2 || kk === 3) { nb = true; break; } } if (nb) continue; }
     const bareAmt = ss(0.62, 0.72, bareNoise(x, y) * 0.75 + bare * 0.55);
     let keep = (1 - bareAmt) * (forest ? 0.35 : c === 4 ? 0.95 : 0.8);
     if (hash2(gx * 3.1, gy * 7.7) > keep) continue;

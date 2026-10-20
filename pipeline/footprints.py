@@ -27,7 +27,7 @@ G = json.load(open(os.path.join(ROOT, 'data', 'geo.json')))
 OV = json.load(open(os.path.join(ROOT, 'data', 'buildings_overrides.json')))
 B = G['buildings']; N0 = len(B)
 X0, X1, Y0, Y1 = G['bounds']; RES = G['res']
-cls = np.array(Image.open(io.BytesIO(base64.b64decode(G['cls']))))
+cls = np.array(Image.open(os.path.join(ROOT, 'data', 'cls_src.png')))  # traced raster (geo.json no longer embeds it)
 H, W = cls.shape
 road_dist = ndi.distance_transform_edt(cls != 1) * RES  # metres to the nearest road pixel
 

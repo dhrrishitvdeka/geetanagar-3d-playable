@@ -24,7 +24,11 @@ export default defineConfig({
   plugins: [shotSaver()],
   // top-level await loads data/geo.json before the world modules evaluate
   // two pages: the explorer (index.html) and the game (game.html)
-  build: { target: 'es2022', chunkSizeWarningLimit: 2000, rollupOptions: { input: { main: 'index.html', game: 'game.html' } } },
+  // three.js and its addons get their own chunk: it rarely changes, so the browser keeps it cached across app deploys
+  build: {
+    target: 'es2022', chunkSizeWarningLimit: 800, // three.js alone is ~750 kB; anything bigger than that is app code worth splitting
+    rolldownOptions: { input: { main: 'index.html', game: 'game.html' }, output: { codeSplitting: { groups: [{ name: 'three', test: /node_modules[\\/]three[\\/]/ }] } } },
+  },
   server: { port: 5173, watch: { ignored: ['**/screenshots/**'] } },
   // pre-bundle every three.js addon up front; discovering them lazily caused reload loops in dev
   optimizeDeps: {

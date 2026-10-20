@@ -26,9 +26,13 @@ function findOpen(x, y) { // nudge a spawn point off buildings
   for (let r = 0; r < 40; r += 1) for (let a = 0; a < 6.28; a += 0.4) { const px = x + Math.cos(a) * r, py = y + Math.sin(a) * r; if (walkable(px, py)) return [px, py]; }
   return [x, y];
 }
+const WR = 0.35; // body radius: the five samples are centre, east, west, north, south (unrolled: this runs for every NPC/animal step)
 function walkable(x, y) {
-  const R = 0.35;
-  for (const [dx, dy] of [[0, 0], [R, 0], [-R, 0], [0, R], [0, -R]]) { const c = clsAt(x + dx, y + dy); if (c === 2 || c === 3) return false; }
+  let c = clsAt(x, y); if (c === 2 || c === 3) return false;
+  c = clsAt(x + WR, y); if (c === 2 || c === 3) return false;
+  c = clsAt(x - WR, y); if (c === 2 || c === 3) return false;
+  c = clsAt(x, y + WR); if (c === 2 || c === 3) return false;
+  c = clsAt(x, y - WR); if (c === 2 || c === 3) return false;
   if (blockedBySeg(x, y)) return false;
   return x > HG.x0 + 5 && x < HGX1 - 5 && y > HG.y0 + 5 && y < HGY1 - 5;
 }

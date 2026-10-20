@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { renderer, scene } from '../core/context.js';
-import { HG, HGY1, clsAt, hAt, hash2 } from '../core/geo.js';
+import { CLS, CRES, CW, CH, CX0, CX1, CY0, CY1, HG, HGY1, HV, MANDIR, clsAt, hAt, hAtBase, hash2, mandirBump, pointInPoly } from '../core/geo.js';
+import { cacheGet, cacheLater, texKey } from '../render/texcache.js';
+import ZONES_SRC from '../veg/zones.js?raw'; // source text of the forest polygon and untraced-road boxes, for the texture cache key
 import { ASSET } from '../veg/assets.js';
 import { GLSL_BARE, getNoiseTex } from '../veg/noise.js';
 import { inForestPoly, onUntracedRoad } from '../veg/zones.js';
@@ -30,9 +32,29 @@ const [maskCanvas, maskTex] = mkCanvasTex();
 const terrain = new THREE.Mesh(tgeo, new THREE.MeshStandardMaterial({ map: groundTex, roughness: 0.97 }));
 terrain.receiveShadow = true; scene.add(terrain);
 
+// ---------- ground cache ----------
+// paintGround() takes about 1.6 s. A later run restores the two RGBA arrays it writes (alpha 255 everywhere) and puts them on the
+// canvases exactly as the painting does. The key covers paintGround and the functions and data it samples (class raster, height grid,
+// forest and road boxes), the preset and the browser. Top-level await because paintGround() is called synchronously.
+const GROUND_KEY = texKey(`ground:${QUALITY}`, [
+  paintGround.toString(), ZONES_SRC, [clsAt, hAt, hAtBase, mandirBump, hash2, pointInPoly].map(f => f.toString()).join(';'),
+  CLS, HV, [HG.x0, HG.y0, HG.nx, HG.ny, HG.step, HGY1, CX0, CX1, CY0, CY1, CRES, CW, CH, TW, TD, GPX], MANDIR, QUALITY]);
+const T_READ = performance.now();
+let GROUND_HIT = await cacheGet(GROUND_KEY);
+const GROUND_READ_MS = performance.now() - T_READ;
+
 function paintGround() {
   const W = groundCanvas.width, H = groundCanvas.height;
   const g = groundCanvas.getContext('2d'), gm = maskCanvas.getContext('2d');
+  const hit = GROUND_HIT; GROUND_HIT = null;
+  const okArr = a => a instanceof Uint8ClampedArray && a.length === W * H * 4;
+  if (hit && hit.w === W && hit.h === H && okArr(hit.col) && okArr(hit.msk)) {
+    const t0 = performance.now();
+    g.putImageData(new ImageData(hit.col, W, H), 0, 0); gm.putImageData(new ImageData(hit.msk, W, H), 0, 0);
+    groundTex.needsUpdate = true; maskTex.needsUpdate = true;
+    console.info(`ground: ${W}x${H} px, from cache, ${(GROUND_READ_MS + performance.now() - t0).toFixed(0)} ms`);
+    return;
+  }
   const img = g.createImageData(W, H), d = img.data, mimg = gm.createImageData(W, H), md = mimg.data;
   // sRGB base tints; the detail textures in the shader supply the fine structure
   const PAL = { 0: [128, 146, 92], 1: [140, 128, 104], 2: [124, 136, 96], 3: [126, 130, 100], 4: [112, 150, 80], 5: [170, 124, 90], 9: [104, 132, 76] };
@@ -65,6 +87,7 @@ function paintGround() {
   }
   g.putImageData(img, 0, 0); gm.putImageData(mimg, 0, 0);
   groundTex.needsUpdate = true; maskTex.needsUpdate = true;
+  cacheLater(GROUND_KEY, () => ({ w: W, h: H, col: d, msk: md })); // the very arrays put above, stored when idle
 }
 
 // ---------- texture helpers ----------
