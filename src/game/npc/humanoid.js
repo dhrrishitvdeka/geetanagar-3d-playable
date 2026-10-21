@@ -185,6 +185,16 @@ function build(kind) {
       for (let i = 0; i < p.count; i++) { const y = p.getY(i), c = y > -0.1 ? [0.78, 0.78, 0.78] : y < -0.87 ? [1, 0.86, 0.58] : [1, 1, 1]; a[i * 3] = c[0]; a[i * 3 + 1] = c[1]; a[i * 3 + 2] = c[2]; }
       g2.setAttribute('color', new THREE.BufferAttribute(a, 3)); return g2;
     }
+    case 'mekhela': { // a near-straight tube from the waist to the ankle (a mekhela is not a bell); darker hem border and waist band
+      const g = new THREE.CylinderGeometry(0.165, 0.2, 1, 14, 8, true); g.deleteAttribute('uv'); g.translate(0, -0.5, 0); const g2 = g.toNonIndexed(), p = g2.attributes.position, a = new Float32Array(p.count * 3);
+      for (let i = 0; i < p.count; i++) { const y = p.getY(i), k = y < -0.86 ? 0.62 : y > -0.1 ? 0.8 : 1; a[i * 3] = a[i * 3 + 1] = a[i * 3 + 2] = k; }
+      g2.setAttribute('color', new THREE.BufferAttribute(a, 3)); return g2;
+    }
+    case 'sador': { // a mekhela's sador: the sash across the chest, and a narrow anchal down the back from the wearer's LEFT shoulder (left is -z with the group facing +x)
+      const sash = new THREE.BoxGeometry(0.035, 0.62, 0.12); sash.rotateX(0.55);
+      const anchal = new THREE.BoxGeometry(0.035, 0.68, 0.13);
+      return merge([bit(sash, [1, 1, 1], 0.118, 0.3, 0), bit(anchal, [1, 1, 1], -0.115, 0.2, -0.085), boxG(0.04, 0.09, 0.13, -0.115, -0.185, -0.085, [0.62, 0.55, 0.5]), boxG(0.1, 0.035, 0.2, 0, 0.545, -0.06, [1, 1, 1])]);
+    }
     case 'wrap': { // chador / sari pallu: a sash across the chest and a drape down the back, darker border at the hem
       const sash = new THREE.BoxGeometry(0.035, 0.62, 0.17); sash.rotateX(0.55);
       const cape = new THREE.BoxGeometry(0.035, 0.68, 0.36); cape.translate(0, 0.0, 0);
@@ -235,9 +245,9 @@ function buildRecipe(app) {
   // garments below the waist: skirts are one open frustum scaled to length and width
   const skirt = (len, w, c) => add('skirt', FR.HIPS, [0, 0.07, 0], [w, len, w], null, c);
   const bs = a.bottomStyle;
-  if (bs === 'mekhela' || bs === 'sari') skirt(0.78, 1.0, bot); else if (bs === 'skirt') skirt(kid ? 0.3 : 0.36, 0.95, bot); else if (bs === 'dhoti') { skirt(0.66, 0.78, bot); tint.thigh = bot; }
+  if (bs === 'mekhela' || bs === 'sari') add('mekhela', FR.HIPS, [0, 0.07, 0], [1, 0.78, 1], null, bot); else if (bs === 'skirt') skirt(kid ? 0.3 : 0.36, 0.95, bot); else if (bs === 'dhoti') { skirt(0.66, 0.78, bot); tint.thigh = bot; }
   if (a.topStyle === 'kurta') skirt(0.5, 0.86, top); else if (a.topStyle === 'robe') skirt(0.8, 1.04, top);
-  if (a.wrap) add('wrap', FR.TORSO, null, null, null, col(a.wrap));
+  if (a.wrap) add(bs === 'mekhela' || bs === 'sari' ? 'sador' : 'wrap', FR.TORSO, null, null, null, col(a.wrap)); // salwar wearers keep the dupatta's cape
   if (a.gamosa) add('gamosa', FR.TORSO, null, null, null, [1, 1, 1]);
   // what the right hand holds (one thing), and carried bags
   let hold = HOLD.NONE;
