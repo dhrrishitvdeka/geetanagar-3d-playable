@@ -65,7 +65,7 @@ function massing(b, bi) {
 
 function buildAll() {
   const FM = facadeMaterials();
-  const W = { rcc: new MeshBuilder(), slide: new MeshBuilder(), assam: new MeshBuilder(), blank: new MeshBuilder() };
+  const W = { rcc: new MeshBuilder(), slide: new MeshBuilder(), assam: new MeshBuilder(), blank: new MeshBuilder(), side: new MeshBuilder() };
   const trim = new MeshBuilder(), rail = new MeshBuilder(), roof = new MeshBuilder(), tin = new MeshBuilder();
   const R = rng(2024);
   // a facade quad from z0 to z1 along edge a->b: u counts bays (0.5 texture units each), v counts floors
