@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GEO, MANDIR, hAt, rng } from '../core/geo.js';
 import { flushRailings, mergeAdd, normalsOf, railing, resample, strip } from './geom.js';
 import { M } from './materials.js';
+import { scene } from '../core/context.js';
 import { cellInstances } from '../render/sectored.js';
 import { buildFieldEdge } from './road/fieldedge.js';
 import RF from '../../data/road_features.json'; // surveyed positions: median, gaps, edges, lights (see _about)
@@ -157,6 +158,22 @@ function buildMain() {
   // one instanced mesh per 60 m of median, so the rows out of view and outside the shadow box are culled
   for (const im of cellInstances(bg, new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.95 }), shrubs)) { im.castShadow = true; im.receiveShadow = true; }
   buildMedianLamps(lamps);
+  buildPotholes();
+}
+// potholes and patched repairs on the carriageways (Street View x -2.4: a dark repair patch in the asphalt): seeded, clear of the speed breaker, the crossings and Hatigarh
+function buildPotholes() {
+  const pr = rng(808), P = MAINP, holes = [], patches = [], d = new THREE.Object3D();
+  for (let k = 0; k < 34; k++) {
+    const i = 2 + Math.floor(pr() * (P.length - 4)), x = P[i][0], s = pr() < 0.5 ? 1 : -1; if (SB.some(b => Math.abs(i - b.bi) < 5) || RF.crossings.some(c => Math.abs(x - c.x) < 5) || Math.abs(x - HAT.x) < 15) continue;
+    const m = medHalf(x), lat = m + 1.0 + pr() * (asphHalf(i) - m - 2.0), along = (pr() - 0.5) * 2.4, n = NRM[i], px = P[i][0] + n[0] * s * lat + n[1] * along, py = P[i][1] + n[1] * s * lat - n[0] * along;
+    const roadAng = Math.atan2(n[0], -n[1]); // rotation about y that lays +x along the road
+    const patch = k % 3 === 0, r = patch ? 0.6 + pr() * 0.9 : 0.3 + pr() * 0.45;
+    d.position.set(px, hAt(px, py) + 0.085, -py); d.rotation.set(0, patch ? roadAng : pr() * 6.28, 0); d.scale.set(r * (patch ? 1.5 : 1.1 + pr() * 0.4), 1, r * (patch ? 1.0 : 0.8)); d.updateMatrix(); (patch ? patches : holes).push(d.matrix.clone());
+  }
+  const mk = (geo, list, name, shade, rough) => { if (!list.length) return; const mat = M.asphalt.clone(); mat.color = new THREE.Color(shade, shade, shade); mat.roughness = rough; mat.polygonOffset = true; mat.polygonOffsetFactor = -6; mat.polygonOffsetUnits = -6;
+    const im = new THREE.InstancedMesh(geo, mat, list.length); im.name = name; list.forEach((mx, j) => im.setMatrixAt(j, mx)); im.receiveShadow = true; scene.add(im); };
+  const disc = new THREE.CircleGeometry(1, 14); disc.rotateX(-Math.PI / 2); const sq = new THREE.PlaneGeometry(1, 1); sq.rotateX(-Math.PI / 2);
+  mk(disc, holes, 'potholes', 0.42, 1); mk(sq, patches, 'road_patches', 0.7, 0.8);
 }
 // median street lights: tapered steel pole with twin curved arms (seen on Street View at the field)
 function buildMedianLamps(idx) {
