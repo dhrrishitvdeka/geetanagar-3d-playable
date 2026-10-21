@@ -54,7 +54,8 @@ function buildAll() {
     else if (a < 220) floors = s < 0.2 ? 1 : s < 0.75 ? 2 : 3;
     else if (a < 600) floors = s < 0.35 ? 2 : s < 0.8 ? 3 : 4;
     else floors = s < 0.55 ? 2 : 3; // very large blobs are usually several joined houses on the map
-    if (b.d < 22 && a > 80 && s2 < 0.55) floors += s2 < 0.2 ? 2 : 1;
+    if (b.d < 30 && a > 120) floors = Math.max(floors, 3 + Math.floor(s2 * 4)); // Street View (Mar 2026): 3-6 storey flats line Mother Teresa Rd
+    else if (b.d < 22 && a > 80 && s2 < 0.55) floors += s2 < 0.2 ? 2 : 1;
     if (b.k) floors = Math.max(floors, 2);
     if (ov.floors) floors = ov.floors;
     const lst = LANDMARK_STYLE.get(b);
@@ -70,7 +71,7 @@ function buildAll() {
     const wallCol = C(ov.wall ? ov.wall : lst ? LCOL[lst.kind] : isTin ? ASSAM_WALLS[Math.floor(s * 997) % ASSAM_WALLS.length] : b.k ? SHOP_WALLS[Math.floor(s2 * SHOP_WALLS.length)] : WALLS[Math.floor(s * 997) % WALLS.length]);
     const tv = hash2(s2 * 9, s * 7); // trim: same paint, off-white bands, or a darker shade
     const trimCol = tv < 0.5 ? wallCol.clone().multiplyScalar(0.93) : tv < 0.75 ? C('#e8e4da') : wallCol.clone().multiplyScalar(0.76);
-    const unfinished = ov.unfinished != null ? ov.unfinished : !isTin && !lst && floors >= 2 && vw === null && s3 > 0.88;
+    const unfinished = ov.unfinished != null ? ov.unfinished : !isTin && !lst && floors >= 2 && vw === null && s3 > 0.965 && b.d > 40;
     const pts = simplifyRing(raw, 0.85);
     const n = pts.length;
 
@@ -119,7 +120,7 @@ function buildAll() {
           if (e.win && !(e.shop && k === 0)) trim.box(e.p, e.u, e.n, 0.15, e.L - 0.15, -0.02, 0.42 + s * 0.16, fb + 2.15, fb + 2.24, trimCol, 'ftu', g);
         }
         // balconies on road-facing walls of 2+ storey houses
-        if (balcony && e.road && e.win && e.L >= 4) {
+        if (balcony && e.win && e.L >= 4 && (e.road || hash2(i * 7.1, s2) < 0.35)) {
           const bw = Math.min(e.L - 1, 3 + hash2(i, s2) * 3.5), a0 = (e.L - bw) * (hash2(s, i + 7) < 0.5 ? 0.5 : 0.15), a1 = a0 + bw, dep = 1.05;
           for (let k = 1; k < floors; k++) {
             if (e.shop && k === 1) continue;
@@ -139,8 +140,8 @@ function buildAll() {
         }
       }
       // AC outdoor units on a few walls, hung beside the windows
-      if (style !== 'blank' && hash2(s2 * 17, s3) < 0.3) {
-        const cnt = 1 + (s > 0.6 ? 1 : 0);
+      if (style !== 'blank' && hash2(s2 * 17, s3) < (floors >= 3 ? 0.65 : 0.3)) {
+        const cnt = 1 + (s > 0.6 ? 1 : 0) + (floors >= 4 ? 1 : 0);
         for (let q = 0; q < cnt; q++) {
           const cand = E.filter(e => e.win && e.L >= 3); if (!cand.length) break;
           const e = cand[Math.floor(R() * cand.length)], bays = Math.max(1, Math.round(e.L / BAY)), k = Math.floor(R() * floors);
@@ -179,7 +180,7 @@ function buildAll() {
         for (let i = 0; i < n; i++) {
           const e = E[i];
           wall(W.blank, e.p, e.q, e.n, z1, z1 + ph, wallCol.clone().multiplyScalar(0.96), top, 0, 0, z1 - 20, z1 - 20);
-          trim.box(e.p, e.u, e.n, -0.03, e.L + 0.03, -0.18, 0.04, z1 + ph, z1 + ph + 0.07, trimCol, 'ft', 1e3);
+          trim.box(e.p, e.u, e.n, -0.03, e.L + 0.03, -0.18, 0.04, z1 + ph, z1 + ph + 0.07, trimCol, 'ft', -1e3);
         }
       } else { // unfinished top floor: stub columns with rusty rebar sticking out, at corners and every ~3.5 m
         for (let i = 0; i < n; i++) {
@@ -187,8 +188,8 @@ function buildAll() {
           for (let k = 0; k < cnt; k++) {
             const al = (k / cnt) * e.L, x = e.p[0] + e.u[0] * al - e.n[0] * 0.17, y = e.p[1] + e.u[1] * al - e.n[1] * 0.17;
             const hh = 0.9 + hash2(x, y) * 1.4, ang = Math.atan2(e.u[1], e.u[0]);
-            trim.boxAt(x, y, ang, 0.3, 0.3, z1, z1 + hh, CONCRETE, 'fbtlr', 1e3);
-            for (const [ox, oy] of [[-0.09, -0.09], [0.09, -0.09], [-0.09, 0.09], [0.09, 0.09]]) trim.boxAt(x + ox, y + oy, ang, 0.025, 0.025, z1 + hh, z1 + hh + 0.5 + hash2(ox + x, oy) * 0.4, REBAR, 'fblr', 1e3);
+            trim.boxAt(x, y, ang, 0.3, 0.3, z1, z1 + hh, CONCRETE, 'fbtlr', -1e3);
+            for (const [ox, oy] of [[-0.09, -0.09], [0.09, -0.09], [-0.09, 0.09], [0.09, 0.09]]) trim.boxAt(x + ox, y + oy, ang, 0.025, 0.025, z1 + hh, z1 + hh + 0.5 + hash2(ox + x, oy) * 0.4, REBAR, 'fblr', -1e3);
           }
         }
       }
