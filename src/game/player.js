@@ -53,10 +53,12 @@ const mulberry = seed => () => { seed = (seed + 0x6d2b79f5) | 0; let t = Math.im
 function buildLook() {
   // a young local in a white gamosa over a t-shirt and jeans, unless the title screen picked something else
   const a = { ...randomAppearance(mulberry(2026), { female: false }), female: false, hairStyle: 'short', gamosa: true, topStyle: 'tshirt', bottomStyle: 'pants', wrap: null, hat: null, umbrella: null, ...state.look, ...(state.wear || {}) }; // an outfit (items.js) goes over the look
-  const next = makeCharacter(a);
+  const next = makeCharacter(a), old = ch;
   if (group) scene.remove(group);
   ch = next; group = ch.group; group.userData.noMerge = true; scale = a.height || 1;
   group.visible = charShown; scene.add(group); placeGroup();
+  // the old model owns its geometry (and, for a rigged one, its materials, mixer and dress meshes): free them, never the shared ones
+  if (old) { if (old.dispose) old.dispose(); else old.group.traverse(o => { if (o.isMesh && o.geometry) o.geometry.dispose(); }); }
 }
 function setLook(a) { if (a && a !== state.look) state.look = a; buildLook(); }
 

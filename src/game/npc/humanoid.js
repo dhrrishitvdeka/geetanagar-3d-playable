@@ -202,7 +202,7 @@ function build(kind) {
     }
     case 'gamosa': { // white cotton scarf round the neck with red ends hanging on the chest
       const ring = new THREE.TorusGeometry(0.1, 0.028, 5, 10); ring.rotateX(Math.PI / 2);
-      return merge([bit(ring, [0.95, 0.95, 0.93], 0, 0.55, 0), boxG(0.02, 0.12, 0.075, 0.118, 0.46, 0.045, [0.95, 0.95, 0.93]), boxG(0.02, 0.1, 0.075, 0.118, 0.35, 0.045, [1, 0.08, 0.06])]);
+      return merge([bit(ring, [0.95, 0.95, 0.93], 0, 0.55, 0), boxG(0.02, 0.12, 0.075, 0.118, 0.46, 0.045, [0.95, 0.95, 0.93]), boxG(0.021, 0.02, 0.077, 0.118, 0.42, 0.045, [1, 0.08, 0.06]), boxG(0.02, 0.1, 0.075, 0.118, 0.35, 0.045, [1, 0.08, 0.06])]);
     }
     case 'hat': return merge([cylG(0.1, 0.5, 0.8, 10, 0.4), cylG(0.02, 0.1, 0.2, 10, 0.9, [1, 0.1, 0.08])]); // cone, base radius 0.5, red knob on top
     case 'blob': return bit(new THREE.IcosahedronGeometry(0.5, 1));

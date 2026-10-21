@@ -383,7 +383,7 @@ function addGamosa(acc, t) {
   acc.geo(band, white, (i, x, y) => torsoInfl(t, y));
   for (const sx of [1, -1]) {
     const strip = grid((u, v) => ringAt(t, yN - (yN - yW) * v, sx * (0.3 + 0.5 * u), 0.04), 4, 24, false);
-    acc.geo(strip, (i) => { const r = Math.floor(i / 5) / 24, c = i % 5; return r > 0.84 && (r < 0.9 || r > 0.93) || c === 0 || c === 4 ? red : white; }, (i, x, y) => torsoInfl(t, y));
+    acc.geo(strip, (i) => { const r = Math.floor(i / 5) / 24, c = i % 5; return r > 0.84 && (r < 0.9 || r > 0.93) || c === 0 || c === 4 || (r > 0.70 && r < 0.82 && c === 2 && Math.floor(r * 48) % 2 === 0) ? red : white; }, (i, x, y) => torsoInfl(t, y)); // the dashed red diamond row above the woven end
   }
 }
 function addHat(acc, t, kind, tint) {
@@ -416,6 +416,17 @@ function buildDress(t, a) {
   if (a.gamosa) addGamosa(acc, t);
   const hat = a.hat || (a.hairStyle === 'cap' ? 'cap' : null);
   if (hat) addHat(acc, t, hat, rgb(a.hatColor || CAPS[(a.top.charCodeAt(1) + a.top.charCodeAt(3)) % CAPS.length]));
+  // Bihu dress: kopou phool (orchids) in the bun and a gold bangle at each wrist, on silk mekhela only
+  if (bs === 'mekhela' && a.fabric === 'silk') {
+    const H1 = [[b.Head, 1]], pinks = ['#c25aa8', '#e7a6d6'];
+    for (let q = 0; q < 5; q++) { const g = new THREE.SphereGeometry(0.014, 6, 5), an = q / 5 * Math.PI * 2; g.translate(t.headX + Math.cos(an) * 0.03, t.headTop - 0.012 + Math.sin(an) * 0.014, t.headZ - t.headHW * 0.55); acc.geo(g, rgb(pinks[q % 2]), H1); }
+    for (const s of ['l', 'r']) { const h = t.handIdle[s], g = new THREE.TorusGeometry(0.04, 0.008, 6, 14); g.rotateX(Math.PI / 2); g.translate(h.x, h.y + 0.02, h.z); acc.geo(g, rgb('#d4a537'), [[b['hand_' + s], 1]], t.Mhand[s]); }
+  }
+  // footwear: a thin chappal sole under each foot (not for kids, who are often barefoot, nor the robed)
+  if (!kid && ts !== 'robe') {
+    const sc = rgb(['#3a2a20', '#7a2e2e', '#2a2a2a'][hashStr(a.top + a.bottom) % 3]);
+    for (const s of ['l', 'r']) { const f = t.Wb[b['foot_' + s]].elements, bl = t.Wb[b['ball_' + s]].elements, g = new THREE.BoxGeometry(0.085, 0.015, Math.abs(bl[14] - f[14]) + 0.16); g.translate((f[12] + bl[12]) / 2, 0.0075, (f[14] + bl[14]) / 2 + 0.03); acc.geo(g, sc, [[b['foot_' + s], 1]]); }
+  }
   // hand-held: phone, umbrella (furled) or stick in the right hand; a hand bag goes to the left when the right is busy
   const hr = t.handIdle.r, hl = t.handIdle.l, hold = a.phone ? 'phone' : a.umbrella ? 'umb' : a.stick ? 'stick' : null, R = [[b.hand_r, 1]], L = [[b.hand_l, 1]];
   if (hold === 'phone') { const g = new THREE.BoxGeometry(0.035, 0.1, 0.014); g.translate(hr.x, hr.y - 0.02, hr.z + 0.03); acc.geo(g, [0.08, 0.08, 0.1], R, t.Mhand.r); }
