@@ -17,6 +17,7 @@ import { initRealPool, releaseReal, updateRealPool } from './realpool.js';
 import { buildNav, findPath, nearestNode, nodeXY, randomPoint, randomPointDir } from './nav.js';
 import { claimSeat, releaseSeat } from '../seats.js';
 import { FIELD, ballInField, ballRef, npcKick, pushBall } from '../worldobjects.js';
+import { kickLoose, nearLoose } from '../loose.js';
 
 // ---------- NPC simulation: ambient crowd, named people, behaviours, avoidance, talking ----------
 const TARGET = { low: 24, medium: 40, high: 64 }[QUALITY] || 40; // ambient population by quality tier
@@ -296,6 +297,21 @@ function behave(n, dt) {
     case 'play': {
       const a = n.anchor || { x: n.x, y: n.y, r: 8 }, t = n.tget ? n.tget() : null;
       if (t) { const tx = Array.isArray(t) ? t[0] : t.x, ty = Array.isArray(t) ? t[1] : t.y, d = Math.hypot(tx - n.x, ty - n.y); if (d > 1.6) { want(tx, ty, n.vRun, true); break; } n.idleState = 'wave'; break; }
+      if (n.kickT > 0) { // the foot meets the ball ~0.17 s into the kick
+        n.kickT -= dt; if (n.kickIn > 0 && (n.kickIn -= dt) <= 0 && n.kO && Math.hypot(n.kO.x - n.x, n.kO.y - n.y) < 0.9) kickLoose(n.kO, n.kA, n.kV, n.kL);
+        if (n.kickT <= 0) { n.idleState = 'idle'; n.faceT = null; } break;
+      }
+      const lb = n.spot ? nearLoose('ball', a.x, a.y, a.r + 14) : null; // a kickabout: whichever kid of the group is nearest the ball goes for it, fetching it if it rolled off
+      if (lb) {
+        n.lookOn = true; n.lookX = lb.x; n.lookY = lb.y; n.lookZ = lb.z;
+        let near = n, nd = Math.hypot(lb.x - n.x, lb.y - n.y); for (const m of n.spot.npcs) { const d = Math.hypot(lb.x - m.x, lb.y - m.y); if (m.behavior === 'play' && !m.talking && d < nd - 0.5) { near = m; nd = d; } }
+        if (near === n) {
+          if (nd > 0.5) { want(lb.x, lb.y, n.vRun, false); break; }
+          const sib = n.spot.npcs.find(m => m !== n && !m.dead), tx = sib ? sib.x : a.x, ty = sib ? sib.y : a.y;
+          n.kickT = 0.45; n.kickIn = 0.17; n.kO = lb; n.kA = Math.atan2(ty - lb.y, tx - lb.x) + rnd(-0.25, 0.25); n.kV = clampN(Math.hypot(tx - lb.x, ty - lb.y) * 0.8 + 1.5, 3, 7); n.kL = rnd(0.3, 1.8);
+          n.idleState = 'kick'; n.faceT = aim(n, lb.x, lb.y); n.hasW = false; break;
+        }
+      }
       if (n.wait > 0) { n.wait -= dt; if (n.wait <= 0) n.idleState = 'idle'; break; }
       if (!n.hasW || Math.hypot(n.t1 - n.x, n.t2 - n.y) < 0.8) {
         for (let k = 0; k < 4; k++) { const ang = rnd(0, 6.28), d = rnd(2, a.r); n.t1 = a.x + Math.cos(ang) * d; n.t2 = a.y + Math.sin(ang) * d; if (walkable(n.t1, n.t2)) break; n.t1 = a.x; n.t2 = a.y; }

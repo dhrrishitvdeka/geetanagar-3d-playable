@@ -72,10 +72,10 @@ note it in your report rather than reaching into someone else's file.
    then on `player` from `ui/controls.js` is kept in sync by `player.js` (`x`, `y` = character, `yaw`/`pitch` = camera).
 3. `initInput`, `initAudio`, `initHUD` (before the world loads), then `initMap`, `initPlayer`, `initTraffic` (turns
    parked vehicles into colliders, so it runs before the NPC walk graph is built), `initAnimals`, `initNPCs`,
-   `initWorldObjects`, `initQuests` (in this order; each in try/catch).
+   `initWorldObjects`, `initLoose`, `initQuests` (in this order; each in try/catch).
 4. Title menu. On `ui:start` the game loads or starts a save and the loop starts updating the game systems.
 5. Each frame while playing: `advanceClock`, `updatePlayer`, `updateNPCs`, `updateAnimals`, `updateTraffic`,
-   `updateWorldObjects`, `updateQuests`, `updateInteract`; always: shadows, vegetation LOD, sky, `renderFrame`,
+   `updateWorldObjects`, `updateLoose`, `updateQuests`, `updateInteract`; always: shadows, vegetation LOD, sky, `renderFrame`,
    `updateLabels`, `updateMap`, `updateHUD`, `endFrame`.
 
 ## Events (src/game/core/bus.js)
@@ -169,7 +169,8 @@ play|follow|pace|football, anchor?: {x, y, r}, path?: [[x, y]], talk? (default t
 lines?: [string] }`. Every NPC with `talk !== false` gets an interactable (`npc:<id>`); talking stops it, turns it to
 the player, emits `npc:talk`, then runs `def.onTalk(npc)` or a random line from `def.lines` / the ambient pool.
 Head look: each frame an NPC may set `lookOn` with `lookX, lookY, lookZ` (a map point and absolute height); `npc/realpool.js` turns
-the rigged model's head and neck toward it. Footballers watch the ball, others the player when close and in front of them. The field's kids are a 3-a-side match (`behavior: 'football'`, `team` 0/1, `fpos` keep/def/att; team 0 attacks
+the rigged model's head and neck toward it. Footballers watch the ball, play kids their ball, others the player when close and
+in front of them. The field's kids are a 3-a-side match (`behavior: 'football'`, `team` 0/1, `fpos` keep/def/att; team 0 attacks
 `FIELD.goals[1]`); they act on the ball only through `npcKick` and `pushBall`. Do not use `n.slot` for anything: it is the
 rigged-model slot from `realpool.js`.
 
@@ -201,6 +202,12 @@ shows the prompt through `hud.setPrompt`), `tryInteract() -> bool`, `getFocused(
 `cx, cy`, long axis `ux, uy`, extents `lo, hi` along it and `wlo, whi` across it, `goals`), `ballRef()` (the live ball, read-only,
 null before init), `ballInField()`, `npcKick(angle, speed, lift) -> bool` (refused while held, after a goal or within 0.3 s of the
 last kick), `pushBall(x, y, r, speed)` (a body shoving the ball out of itself).
+
+### loose.js (gameplay mechanics)
+`initLoose()`, `updateLoose(dt, player)`, `nearLoose(kind, x, y, r) -> obj | null`, `kickLoose(obj, angle, speed, lift)`.
+Kinds `ball` (one, Children's Park; the play kids kick it about, the player can kick it with E), `can`, `bottle` (by the field
+kiosks, the tea stall, Hatigarh and the bus stand). The player and NPCs knock them over by walking into them; they reset on
+`game:start`. Three InstancedMeshes; only objects within 60 m of the player are simulated.
 
 Item ids (`items.js`): `lal_sah doodh_sah samosa pitha jalebi biscuits banana marigold water newspaper cash_bag parcel`.
 Shop ids: `tea_stall` (Bina, park forecourt x -121), `pan_tea` (Khagen, field kiosk x 24), `store` (Mamoni, x 31),

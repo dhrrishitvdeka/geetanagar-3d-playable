@@ -30,6 +30,7 @@ import { preloadCharacters } from './npc/realchars.js';
 import { initAnimals, updateAnimals } from './animals.js';
 import { initTraffic, updateTraffic } from './traffic.js';
 import { initWorldObjects, takePhoto, updateWorldObjects } from './worldobjects.js';
+import { initLoose, updateLoose } from './loose.js';
 import { initQuests, updateQuests } from './quests.js';
 import { tryInteract, updateInteract } from './interact.js';
 import { bigMessage, closeModals, fade, getOpenMenu, initHUD, isUIBlocking, setLoading, showMenu, updateHUD } from './hud.js';
@@ -76,7 +77,7 @@ let spawn = { x: 0, y: 0, heading: Math.PI / 2 };
   // traffic first: it turns parked vehicles into colliders, which the NPC walk graph then respects
   await charsReady;
   safe('initMap', initMap); safe('initPlayer', initPlayer); safe('initTraffic', initTraffic); safe('initAnimals', initAnimals);
-  safe('initNPCs', initNPCs); safe('initWorldObjects', initWorldObjects); safe('initQuests', initQuests);
+  safe('initNPCs', initNPCs); safe('initWorldObjects', initWorldObjects); safe('initLoose', initLoose); safe('initQuests', initQuests);
   safe('updateNearTrees', () => updateNearTrees(true));
   { const p = getPlayer(); spawn = { x: p.x, y: p.y, heading: p.heading }; } // where a new game starts: the field, as the explorer does
   // compile every material in the scene now, behind the loading screen, instead of stalling the first frames that see it
@@ -184,7 +185,7 @@ renderer.setAnimationLoop(now => {
         moveSun(false);
         updatePlayer(dt);
         const p = getPlayer();
-        updateNPCs(dt, p); updateAnimals(dt, p); updateTraffic(dt, p); updateWorldObjects(dt, p); updateQuests(dt, p);
+        updateNPCs(dt, p); updateAnimals(dt, p); updateTraffic(dt, p); updateWorldObjects(dt, p); updateLoose(dt, p); updateQuests(dt, p);
         updateInteract(p);
         setListener(p.x, p.y, p.heading);
         if (!transitioning && (saveT += dt) > 60) { saveT = 0; autosave(); }
