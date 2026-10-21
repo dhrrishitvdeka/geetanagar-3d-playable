@@ -24,7 +24,7 @@ const RAIL = ['#6d7277', '#2a2c2e', '#7c8186', '#4b5a50', '#d4d2cb', '#5a4a3e'];
 const LCOL = { school: '#e9dcb6', temple: '#f3efe6', namghar: '#efebe2', bank: '#dcdfe0' };
 const CONCRETE = new THREE.Color('#a8a49b'), REBAR = new THREE.Color('#4a3b30'), DOOR = new THREE.Color('#5b4a3c'), AC = new THREE.Color('#dcdedb');
 
-const BLD = [], SHOPLIST = [], tanks = [];
+const BLD = [], SHOPLIST = [], tanks = [], ROOFS = []; // ROOFS: the flat roofs, for the clutter in details.js
 const C = (hex) => new THREE.Color(hex);
 
 function buildAll() {
@@ -219,6 +219,7 @@ function buildAll() {
           if (pointInPoly(tx, ty, pts) && !(mumty && Math.hypot(tx - mumty.x, ty - mumty.y) < 2.6)) tanks.push({ x: tx, y: ty, z: z1, n: a > 300 ? 2 : 1 });
         }
       }
+      if (!unfinished && !lowSight && !lst) ROOFS.push({ pts, E, z1, c: b.c, a, floors, mumty, longest });
     }
     BLD.push({ c: b.c, top: z1, floors });
     if (lst) decorateLandmark(b, lst, z1 + (isTin ? 0 : 0.95));
@@ -241,4 +242,4 @@ function buildAll() {
   if (import.meta.env.DEV) console.info(`[buildings] ${BLD.length} buildings, facade textures ${FM.ms.toFixed(0)} ms, verts: walls ${Object.values(W).reduce((s, m) => s + m.verts, 0)}, trim ${trim.verts}, rail ${rail.verts}`);
 }
 
-export { buildAll, WALLS, SHOP_WALLS, TIN, SLAB, tanks, BLD, SHOPLIST };
+export { buildAll, WALLS, SHOP_WALLS, TIN, SLAB, tanks, BLD, SHOPLIST, ROOFS };

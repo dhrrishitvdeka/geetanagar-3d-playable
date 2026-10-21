@@ -113,3 +113,25 @@ Generic splitting also ran. For blobs over 600 m² that carry no override and si
 
 - **Not verified:** the exact cut lines of 912 and 775, the identity of 1451 and 1452, and every generic split. Parts on a shared cut line touch exactly, so the walls between them are coincident faces.
 - **New parts and `a`/`k`/`d`:** `a` is the part's area, `k` is 1 when most of it is class 3, and `d` is the parent's `d` shifted by the part's change in distance to the nearest road pixel (the original `d` is not exactly reproducible from the raster).
+
+# Small details on walls and roofs (`src/world/details.js`)
+
+Runs after `buildCompoundWalls` in both `src/main.js` and `src/game/main.js`. `compound.js` records every wall piece (`WALL_FACES`:
+centreline, road-facing normals, height, thickness) and gate (`GATE_POSTS`); `buildings.js` records the finished flat roofs that are
+not landmarks and are clear of the View point sightline (`ROOFS`). Everything is seeded per piece, gate or roof, so it is the same on
+every visit. None of it has a collider.
+
+- **Walls:** paper posters at eye level, alone, overlapping in twos and threes, or the same one pasted in a row (tuition, coaching,
+  a Rongali Bihu poster, a blood donation camp, a homeo clinic, a yoga class); painted ads on long plain stretches (a mustard-oil and
+  a cement brand, both invented) and STICK NO BILLS; now and then a Bihu flex banner; NO PARKING or TO-LET beside some gates. Posters
+  span lane segments only where the wall runs straight under them. About one wall piece in nine has a row of pots on its coping
+  (terracotta, the odd paint bucket; leafy clumps or snake plants, some in flower).
+- **Gates:** about half have a name plate on a pillar: Assamese house names (Kalita Niwas, Shanti Kutir, Matri Chhaya...) on black
+  granite or white marble, or a house number on blue enamel.
+- **Roofs:** a DTH dish (about 60 cm offset dish, LNB arm off the lower rim) on the most south-facing parapet, or on the stair room;
+  bigger roofs sometimes have two. About a third of roofs over 40 m2 have a washing line along the longest edge, clear of the stair
+  room and tanks: gamosa, saris, a mekhela, sheets, towels, shirts, trousers and a child's frock, swaying in the town's wind
+  (`VEG_U` from veg/wind.js).
+- Counts on the current map: about 760 posters and ads, 290 name plates, 490 pots, 470 dishes, 57 washing lines; built in ~50 ms.
+- All of this is generic Guwahati street detail, invented and placed by seed. None of it is surveyed per plot.
+

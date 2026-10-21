@@ -24,6 +24,9 @@ const PAINT = [['#ecebe5', '#e4e2da', '#f0eee9'], ['#a9abab', '#8e9293', '#b9bab
 const BRICK = ['#ffffff', '#f0dcd2', '#e3cabd'];
 const GATE = ['#8d9296', '#8d9296', '#46705a', '#46705a', '#3b5f93', '#3b5f93', '#4f5357'];
 const pick = (r, a) => a[Math.floor(r() * a.length)];
+// what details.js hangs on the walls: each wall piece (centreline [x, y, arc], road-facing normals, height, thickness) and each gate
+// (npc/routines.js also gives the regulars their homes behind the open ones)
+const WALL_FACES = [], GATE_POSTS = [];
 
 // ---------- mesh accumulators: one per material, flat-shaded quads ----------
 const acc = () => ({ p: [], n: [], u: [], c: [], i: [] });
@@ -196,13 +199,14 @@ function laneRun(A, pts, s, len, st, old = false) {
     for (const [pa, pb] of pieces) {
       if (pb - pa < 0.3) continue;
       const q = slice(pa, pb), nr = kk => { const e = at(q[kk][2]); return [e.nx, e.ny]; };
-      slab(body, q, nr, tw, null, h, col, uu, vv); slab(A.pl, q, nr, tw + 0.1, h, h + 0.07, cap, 2.4, 2.4);
+      slab(body, q, nr, tw, null, h, col, uu, vv); slab(A.pl, q, nr, tw + 0.1, h, h + 0.07, cap, 2.4, 2.4); WALL_FACES.push({ q, n: q.map((_, kk) => nr(kk)), h, t: tw });
       for (let m = 0; m < q.length - 1; m++) { addCollider([q[m][0], q[m][1]], [q[m + 1][0], q[m + 1][1]]); st.len += Math.hypot(q[m + 1][0] - q[m][0], q[m + 1][1] - q[m][1]); }
     }
     for (const aa of (k === 0 ? [a, b] : [b])) { const e = at(aa); post(A.pl, e.x, e.y, e.tx, e.ty, 0.4, h + 0.12, pcol, cap); }
     if (g == null) continue;
     const e = at(g), L = (u, v) => [e.x + e.tx * u + e.nx * v, e.y + e.ny * v + e.ty * u], gh = Math.min(h - 0.1, 1.85) + 0.05;
     for (const sd of [-1, 1]) { const c = L(sd * (hg + PIL), 0); post(A.pl, c[0], c[1], e.tx, e.ty, PIL * 2, h + 0.3, pcol, cap); }
+    GATE_POSTS.push({ x: e.x, y: e.y, tx: e.tx, ty: e.ty, nx: e.nx, ny: e.ny, hg, h, t: tw, open: true, lane: true });
     for (const sd of [-1, 1]) { // leaves swung into the yard, at a random angle
       const p1 = L(sd * (hg - 0.05), -0.05), ang = 0.6 + r() * 0.8, p2 = L(sd * (hg - 0.05) - sd * Math.cos(ang) * hg, -Math.sin(ang) * hg);
       const y1 = hAt(p1[0], p1[1]) + 0.12, y2 = hAt(p2[0], p2[1]) + 0.12;
@@ -309,7 +313,7 @@ export function buildCompoundWalls() {
         if (pb - pa < 0.3) continue;
         const q = slice(pa, pb), nr = nrAt(q); st.pieces++;
         slab(body, q, nr, tw, null, h, col, uu, vv);
-        slab(A.pl, q, nr, tw + 0.1, h, h + 0.07, cap, 2.4, 2.4);
+        slab(A.pl, q, nr, tw + 0.1, h, h + 0.07, cap, 2.4, 2.4); WALL_FACES.push({ q, n: q.map((_, kk) => nr(kk)), h, t: tw });
         for (let m = 0; m < q.length - 1; m++) { addCollider([q[m][0], q[m][1]], [q[m + 1][0], q[m + 1][1]]); segs.push({ a: [q[m][0], q[m][1]], b: [q[m + 1][0], q[m + 1][1]], s }); st.segments++; st.len[s === 1 ? 'N' : 'S'] += Math.hypot(q[m + 1][0] - q[m][0], q[m + 1][1] - q[m][1]); }
         if (panel) { const m = Math.round((pb - pa) / 3.2); for (let j = 1; j < m; j++) { const e = at(pa + (pb - pa) * j / m); post(A.pl, e.x, e.y, e.tx, e.ty, pw, h + 0.05, pcol, cap); } }
       }
@@ -323,6 +327,7 @@ export function buildCompoundWalls() {
         quad(A.gt, [W(p1[0], p1[1], y1), W(p2[0], p2[1], y2), W(p2[0], p2[1], y2 + gh), W(p1[0], p1[1], y1 + gh)], gcol, [[0, 0], [1, 0], [1, 1], [0, 1]]);
       };
       for (const sd of [-1, 1]) { const c = L(sd * (hg + PIL), 0); post(A.pl, c[0], c[1], e.tx, e.ty, PIL * 2, h + 0.35, pcol, cap); }
+      GATE_POSTS.push({ x: e.x, y: e.y, tx: e.tx, ty: e.ty, nx: e.nx, ny: e.ny, hg, h, t: tw, open, lane: false });
       const availL = g - hg - PIL - a, availR = b - g - hg - PIL - PIL;
       let side = availR >= availL ? 1 : -1; const slideOk = sliding && Math.max(availL, availR) >= wg * 0.8;
       if (!open) {
@@ -375,3 +380,4 @@ export function buildCompoundWalls() {
   console.info(`[compound] ${st.runs} runs, ${st.pieces} wall pieces, ${st.segments} segments, wall length N ${st.len.N.toFixed(0)} m / S ${st.len.S.toFixed(0)} m, ${st.gates} gates (${st.open} open), ${st.booths} gatehouses; segments inside skip zones: ${st.inSkip}; segments with commercial pixels 1-4 m behind: ${st.shopBehind}; skipped samples ${JSON.stringify(st.skip)}; ${st.ms} ms`);
   return st;
 }
+export { WALL_FACES, GATE_POSTS, PIL };
