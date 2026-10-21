@@ -2,7 +2,8 @@
 
 A walkable 3D replica of Geetanagar, Guwahati (Assam), built with three.js and Vite.
 
-On Windows, double-click `run.bat`: it installs dependencies the first time and opens the app in your browser. Or by hand:
+On Windows, double-click `run.bat`: it installs dependencies the first time and opens the game in its own Edge (or Chrome, Brave)
+window on the laptop's dedicated GPU (`scripts/open-gpu.js`; Chromium browsers otherwise give WebGL the integrated GPU). Or by hand:
 
 ```
 npm install

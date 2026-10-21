@@ -20,5 +20,7 @@ if not exist node_modules (
 )
 
 echo Starting Geetanagar 3D at http://localhost:5173  (close this window to stop)
+rem the game opens in its own window on the dedicated GPU (see scripts\open-gpu.js)
+set "BROWSER=scripts\open-gpu.js"
 call npm run dev -- --open /game.html
 pause
