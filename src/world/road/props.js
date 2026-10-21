@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { scene } from '../../core/context.js';
 import { hAt, rng } from '../../core/geo.js';
+import { footRaise } from './footpath.js';
 import { addCollider } from '../geom.js';
 import { M, box, canvasTex, std } from '../materials.js';
 import { banner } from './textures.js';
@@ -8,7 +9,7 @@ import { banner } from './textures.js';
 // ---------- roadside props: Hatigarh traffic island, stalls, signals, cabinets, carts, high-mast light ----------
 // Local frame for props: +x = the side facing the road / the front, y up.
 function put(g, x, y, ang = 0, lift = 0) {
-  g.position.set(x, hAt(x, y) + lift, -y); g.rotation.y = ang;
+  g.position.set(x, hAt(x, y) + footRaise(x, y) + lift, -y); g.rotation.y = ang; // footRaise: props on a raised footpath stand on it
   g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } }); scene.add(g); return g;
 }
 const add = (g, m, x, y, z, rx = 0, ry = 0, rz = 0) => { m.position.set(x, y, z); m.rotation.set(rx, ry, rz); g.add(m); return m; };

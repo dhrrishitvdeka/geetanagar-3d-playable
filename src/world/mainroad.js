@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { GEO, MANDIR, hAt, rng } from '../core/geo.js';
-import { mergeAdd, normalsOf, railing, resample, strip } from './geom.js';
+import { flushRailings, mergeAdd, normalsOf, railing, resample, strip } from './geom.js';
 import { M } from './materials.js';
 import { cellInstances } from '../render/sectored.js';
 import { buildFieldEdge } from './road/fieldedge.js';
@@ -19,7 +19,7 @@ const hw = i => Math.max(9, Math.min(13.5, MAINP[i][2] / 2));   // half of the f
 const MED = 0.7, FOOT = 2.3, KERB_H = 0.18, MED_H = 0.3, KERB_W = 0.4;
 const RM = RF.median, MED_X0 = RM.start_x, MED_X1 = RM.end_x; // median nose and end (road_features.json)
 const lerp = (a, b, t) => a + (b - a) * Math.max(0, Math.min(1, t));
-const inMedGap = x => RF.median_gaps.some(g => Math.abs(x - g.x) < g.w / 2);
+const inMedGap = x => RF.median_gaps.some(g => Math.abs(x - g.x) < g.w / 2) || RF.crossings.some(c => Math.abs(x - c.x) < 1.25); // MAINP is sampled every 2.5 m, so a +-1.25 m window always catches one sample
 function medHalf(x) {
   if (x < MED_X0 || x > MED_X1) return 0;
   if (x < MED_X0 + 5) return lerp(0.45, RM.wide_half_m, (x - MED_X0) / 5);
@@ -56,11 +56,40 @@ function runs(s) { // contiguous index ranges with the same edge kind (sharing t
 }
 const sub = (a, b) => MAINP.slice(a, b + 1);
 
+// ---------- raised footpaths along Mother Teresa Rd (Street View, Mar 2026; owner's photos) ----------
+// A 1.5 m slab footpath 0.4 m above the asphalt (it covers the drain), its road face painted in black-and-white kerb blocks.
+// Each run slopes to road level over one 2.5 m step at both ends, so lane mouths and gates can be stepped onto.
+const FP_H = 0.4, FP_W = 1.5; // owner, Oct 2026: higher than the first 0.25 m spec
+const RAISED = { kerb: FP_H, mandir: KERB_H }, N = MAINP.length;
+const RS = { 1: new Int32Array(N).fill(-1), '-1': new Int32Array(N).fill(-1) }, RE = { 1: new Int32Array(N), '-1': new Int32Array(N) }, RH = { 1: new Float32Array(N), '-1': new Float32Array(N) };
+for (const s of [1, -1]) {
+  let a = -1;
+  for (let i = 0; i <= N; i++) {
+    const h = i < N ? RAISED[edgeKind(s, i)] || 0 : 0;
+    if (h && a < 0) a = i;
+    if (a >= 0 && (!h || i === N)) { for (let k = a; k < i; k++) { RS[s][k] = a; RE[s][k] = i - 1; RH[s][k] = RAISED[edgeKind(s, k)]; } a = -1; }
+  }
+}
+// height of the footpath top at main-road index f (fractional), 0 outside a raised run; the run's end indices sit at road level
+function fpHeightAt(s, f) { const k = Math.max(0, Math.min(N - 1, Math.round(f))); return RS[s][k] < 0 ? 0 : RH[s][k] * Math.max(0, Math.min(1, f - RS[s][k], RE[s][k] - f)); }
+const fpWidth = (s, i) => edgeKind(s, i) === 'mandir' ? hw(i) + 0.6 - asphHalf(i) : FP_W;
+const FOOT_RUNS = []; // { s, a, b } of every raised 'kerb' run, filled by buildMain; buildFootRails puts the railing on them
+// speed breakers (road_features.json): a hump across both carriageways, 3.5 m long and 7 cm high, centred on a main-road sample
+const SB_HALF = 1.75, SB_H = 0.07;
+const SB = RF.speed_breakers.map(b => { let bi = 0, bd = 1e9; MAINP.forEach((p, i) => { const d = Math.abs(p[0] - b.x); if (d < bd) { bd = d; bi = i; } }); return { bi }; });
+// hump height at fractional main-road index f (0 off the breaker); the road mesh and footRaise both read it
+const humpAt = f => { for (const b of SB) { const a = (f - b.bi) * 2.5; if (Math.abs(a) < SB_HALF) return SB_H * Math.cos(a / SB_HALF * Math.PI / 2); } return 0; };
+
 const KERB_GREEN_TO = -60; // median kerb is painted black-green west of this x
 function buildMain() {
-  const P = MAINP, asph = [], dust = [], kerb = [], kerbG = [], shoulder = [], med = [], pave = [];
+  const P = MAINP, asph = [], dust = [], kerb = [], kerbG = [], shoulder = [], med = [], pave = [], foot = [], sbump = [];
   for (const s of [1, -1]) {
     asph.push(strip(P, i => s * medHalf(P[i][0]), i => s * asphHalf(i), 0.06, 0.06, 6));
+    for (const { bi } of SB) { // the speed breaker: ten slices across this carriageway, height 0.07 sin(pi t) over its 3.5 m
+      const c = P[bi], n = NRM[bi], tx = n[1], ty = -n[0], q = resample(P.slice(Math.max(0, bi - 3), bi + 4), 0.35).filter(p => Math.abs((p[0] - c[0]) * tx + (p[1] - c[1]) * ty) <= SB_HALF);
+      const hump = i => 0.065 + SB_H * Math.cos(((q[i][0] - c[0]) * tx + (q[i][1] - c[1]) * ty) / SB_HALF * Math.PI / 2);
+      sbump.push(strip(q, i => s * medHalf(q[i][0]), i => s * asphHalf(bi), hump, hump, 0.7, true));
+    }
     // dust drifts along the outer edge, and a thinner band against the median kerb
     dust.push(strip(P, i => s * (asphHalf(i) - 2.0), i => s * asphHalf(i), 0.065, 0.065, 4, true));
     const mi = P.findIndex(p => p[0] >= MED_X0);
@@ -69,17 +98,18 @@ function buildMain() {
     for (const [a, b, kind] of runs(s)) {
       const Q = sub(a, b), o = i => asphHalf(a + i), H = i => hw(a + i);
       if (kind === 'kerb') {
-        kerb.push(strip(Q, i => s * o(i), i => s * o(i), 0.04, KERB_H, 2.4, true));                              // road face
-        kerb.push(strip(Q, i => s * o(i), i => s * (o(i) + KERB_W), KERB_H, KERB_H, 2.4, true));                 // top
-        kerb.push(strip(Q, i => s * (o(i) + KERB_W), i => s * (o(i) + KERB_W), KERB_H, 0.0, 2.4, true));         // back
-        shoulder.push(strip(Q, i => s * (o(i) + KERB_W), i => s * (H(i) + 0.8), 0.04, 0.04, 4));
-        railing(Q.map((p, i) => [p[0] + NRM[a + i][0] * s * (o(i) + 0.2), p[1] + NRM[a + i][1] * s * (o(i) + 0.2)]),
-          { h: 0.95, spacing: 2.4, base: KERB_H, rails: [0.1, 0.96], post: 0.07, infill: 'railInfill', infillSpan: [0.1, 0.96],
-            skip: m => RF.bus_stops.some(b => (b.side === 'N') === (s === 1) && Math.abs(m[0] - b.x) < 4) }); // open in front of bus stops
+        // raised slab footpath: painted road face, slab top, back face; the railing is added later by buildFootRails (it needs the gates)
+        const fh = i => fpHeightAt(s, a + i);
+        kerb.push(strip(Q, i => s * o(i), i => s * o(i), 0.04, fh, 2.4, true));
+        foot.push(strip(Q, i => s * o(i), i => s * (o(i) + FP_W), fh, fh, 1.0));
+        kerb.push(strip(Q, i => s * (o(i) + FP_W), i => s * (o(i) + FP_W), fh, 0.0, 2.4, true));
+        shoulder.push(strip(Q, i => s * (o(i) + FP_W), i => s * (H(i) + 0.8), 0.04, 0.04, 4));
+        FOOT_RUNS.push({ s, a, b });
       } else if (kind === 'culvert' || kind === 'mandir') {
-        kerb.push(strip(Q, i => s * o(i), i => s * o(i), 0.04, KERB_H, 2.4, true));
-        kerb.push(strip(Q, i => s * o(i), i => s * (o(i) + KERB_W), KERB_H, KERB_H, 2.4, true));
-        if (kind === 'mandir') { pave.push(strip(Q, i => s * (o(i) + KERB_W), i => s * (H(i) + 0.6), KERB_H, KERB_H, 2.2)); kerb.push(strip(Q, i => s * (H(i) + 0.6), i => s * (H(i) + 0.6), KERB_H, 0, 2.4, true)); }
+        const kh = kind === 'mandir' ? i => fpHeightAt(s, a + i) : KERB_H; // the mandir apron follows footRaise, so feet and geometry agree
+        kerb.push(strip(Q, i => s * o(i), i => s * o(i), 0.04, kh, 2.4, true));
+        kerb.push(strip(Q, i => s * o(i), i => s * (o(i) + KERB_W), kh, kh, 2.4, true));
+        if (kind === 'mandir') { pave.push(strip(Q, i => s * (o(i) + KERB_W), i => s * (H(i) + 0.6), kh, kh, 2.2)); kerb.push(strip(Q, i => s * (H(i) + 0.6), i => s * (H(i) + 0.6), kh, 0, 2.4, true)); }
         else { kerb.push(strip(Q, i => s * (o(i) + KERB_W), i => s * (o(i) + KERB_W), KERB_H, 0.0, 2.4, true)); shoulder.push(strip(Q, i => s * (o(i) + KERB_W), i => s * (H(i) + 0.8), 0.04, 0.04, 4)); }
         const line = Q.map((p, i) => [p[0] + NRM[a + i][0] * s * (o(i) + 0.2), p[1] + NRM[a + i][1] * s * (o(i) + 0.2)]);
         if (kind === 'culvert') railing(line, { h: 0.85, spacing: 1.6, base: KERB_H, rails: [0.45, 0.85], post: 0.18, postMat: 'kerb', railMat: 'kerb' });
@@ -108,7 +138,7 @@ function buildMain() {
     // median railing: maroon posts, black verticals between a bottom and a top rail (Street View x -145 and x -27, Mar 2026)
     railing(PM.slice(1, -1).map(p => [p[0], p[1]]), { h: 0.95, spacing: 2.5, base: MED_H, rails: [0.12, 0.95], post: 0.07, postMat: 'maroon', infill: 'railInfill', infillSpan: [0.12, 0.95] });
   }
-  mergeAdd(asph, M.asphalt); mergeAdd(dust, M.dust); mergeAdd(kerb.map(g => (g.index ? g.toNonIndexed() : g)), M.kerb); mergeAdd(kerbG.map(g => (g.index ? g.toNonIndexed() : g)), M.kerbGreen); mergeAdd(med, M.median); mergeAdd(shoulder, M.shoulder); if (pave.length) mergeAdd(pave, M.paver);
+  mergeAdd(asph, M.asphalt); mergeAdd(dust, M.dust); mergeAdd(kerb.map(g => (g.index ? g.toNonIndexed() : g)), M.kerb); mergeAdd(kerbG.map(g => (g.index ? g.toNonIndexed() : g)), M.kerbGreen); mergeAdd(med, M.median); mergeAdd(shoulder, M.shoulder); mergeAdd(foot, M.footSlab); mergeAdd(sbump, M.speedBreaker); if (pave.length) mergeAdd(pave, M.paver);
   // pink bougainvillea and green shrubs along both sides of the railing, small trees in the wide western stretch
   const r = rng(31), bush = [];
   for (const run of medRuns) for (let k = 1; k < run.length - 1; k++) {
@@ -146,4 +176,17 @@ function buildMedianLamps(idx) {
 }
 const MEDIAN_TREES = [];
 
-export { nearestOnMain, buildMain, MAINP, NRM, hw, MED, FOOT, KERB_H, KERB_W, MED_H, MAIN_JUNC, hatigarh, HAT, MEDIAN_TREES, medHalf, asphHalf, edgeKind, MED_X0, RF };
+// railing along the back edge of every footpath run, open at the crossings, in front of the bus stop and at the compound gates on the road
+// (gatePosts comes from compound.js, passed in so this file never imports it)
+function buildFootRails(gatePosts) {
+  const gates = gatePosts.filter(g => !g.lane);
+  const open = m => RF.crossings.some(c => Math.abs(m[0] - c.x) < 1.6) || RF.bus_stops.some(b => Math.abs(m[0] - b.x) < 4) || gates.some(g => Math.hypot(m[0] - g.x, m[1] - g.y) < 1.8);
+  for (const { s, a, b } of FOOT_RUNS) {
+    if (b - a < 4) continue; // the end indices of a run sit at road level, so the railing keeps one step in from each
+    const line = []; for (let i = a + 1; i <= b - 2; i++) { const off = asphHalf(i) + FP_W - 0.1; line.push([MAINP[i][0] + NRM[i][0] * s * off, MAINP[i][1] + NRM[i][1] * s * off]); }
+    railing(line, { h: 0.95, spacing: 2.4, base: FP_H, rails: [0.1, 0.96], post: 0.07, infill: 'railInfill', infillSpan: [0.1, 0.96], skip: open });
+  }
+  flushRailings();
+}
+
+export { nearestOnMain, buildMain, buildFootRails, MAINP, NRM, hw, MED, FOOT, KERB_H, KERB_W, MED_H, MAIN_JUNC, hatigarh, HAT, MEDIAN_TREES, medHalf, asphHalf, edgeKind, MED_X0, RF, FP_H, FP_W, fpHeightAt, fpWidth, inMedGap, humpAt };

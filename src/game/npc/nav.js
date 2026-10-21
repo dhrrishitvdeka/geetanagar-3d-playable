@@ -1,7 +1,7 @@
 import { GEO } from '../../core/geo.js';
 import { walkable } from '../../ui/controls.js';
 import { normalsOf } from '../../world/geom.js';
-import { HAT, KERB_W, MAINP, NRM, RF, asphHalf, edgeKind, hw, nearestOnMain } from '../../world/mainroad.js';
+import { FP_W, MAINP, NRM, RF, asphHalf, edgeKind, hw, nearestOnMain } from '../../world/mainroad.js';
 
 // ---------- pedestrian walk graph over the real lanes ----------
 // Every lane gets two side tracks (keep-left: the left-hand track prefers the lane's own direction, the right-hand one the
@@ -69,7 +69,8 @@ function buildNav() {
   for (const s of [1, -1]) {
     let prev = -1, prevI = -1;
     for (let i = 0; i < MAINP.length; i += 2) {
-      const off = asphHalf(i) + (edgeKind(s, i) === 'kerb' ? KERB_W + 0.9 : 1.3), x = MAINP[i][0] + NRM[i][0] * s * off, y = MAINP[i][1] + NRM[i][1] * s * off;
+      const off = asphHalf(i) + (edgeKind(s, i) === 'kerb' ? FP_W / 2 : 1.3), // people walk on the middle of the raised footpath
+         x = MAINP[i][0] + NRM[i][0] * s * off, y = MAINP[i][1] + NRM[i][1] * s * off;
       if (!walkable(x, y)) continue;
       const n = addNode(x, y); SH[s].push([i, n]);
       if (prev >= 0 && i - prevI <= 4) link(prev, n); prev = n; prevI = i;
@@ -78,10 +79,11 @@ function buildNav() {
   const shoulderNear = (s, x, y, maxD) => { let best = -1, bd = maxD; for (const [, n] of SH[s]) { const d = Math.hypot(NX[n] - x, NY[n] - y); if (d < bd) { bd = d; best = n; } } return best; };
   // crossings between the two shoulders: Hatigarh, the bus stand, the field gate and the mandir. The bus stand's is a few metres west
   // of the shelter (x -57): right at it the north end landed in the corner where the field railing starts (x -58) and walkers got boxed in.
-  for (const cx of [HAT.x, -61.5, -20, 49.5]) {
+  for (const cx of RF.crossings.map(c => c.x)) { // road_features.json: the same list the median and the footpath railing open at
     let bi = 0, bd = 1e9; MAINP.forEach((p, i) => { const d = Math.abs(p[0] - cx); if (d < bd) { bd = d; bi = i; } });
-    const near = s => { let b = -1, bdd = 1e9; for (const [i, n] of SH[s]) { const d = Math.abs(i - bi); if (d < bdd) { bdd = d; b = n; } } return bdd <= 6 ? b : -1; };
-    const a = near(1), b = near(-1); if (a < 0 || b < 0) continue;
+    // a node exactly at the opening (the shoulder nodes are only every 5 m, so a straight line between them could clip the median's nose)
+    const end = s => { const off = asphHalf(bi) + (edgeKind(s, bi) === 'kerb' ? FP_W / 2 : 1.3), x = MAINP[bi][0] + NRM[bi][0] * s * off, y = MAINP[bi][1] + NRM[bi][1] * s * off; if (!walkable(x, y)) return -1; const n = addNode(x, y), m = shoulderNear(s, x, y, 7); if (m >= 0) link(n, m); return n; };
+    const a = end(1), b = end(-1); if (a < 0 || b < 0) continue;
     const len = dist(a, b), n = Math.max(2, Math.round(len / 3)); let prev = a;
     for (let k = 1; k < n; k++) { const t = k / n, m = addNode(NX[a] + (NX[b] - NX[a]) * t, NY[a] + (NY[b] - NY[a]) * t, 1); link(prev, m, 1.1, 1.1); prev = m; }
     link(prev, b, 1.1, 1.1);

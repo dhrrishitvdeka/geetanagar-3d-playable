@@ -5,6 +5,7 @@ import { mode, player } from '../ui/controls.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { rng } from '../core/geo.js';
 import { canvasTex } from './materials.js';
+import { footRaise } from './road/footpath.js';
 
 // The View point is a paved hilltop terrace, not a raised deck. Visitor photos on its Google Maps page (2022-2023)
 // show square grey floor tiles and a black iron railing with gold spear finials, looking south over red tin roofs
@@ -16,8 +17,8 @@ const DECK = (() => {
 })();
 const VP_EYE = DECK.top + 1.62;
 function inDeck(x, y, pad = 0) { return Math.abs(x - DECK.cx) <= DECK.w / 2 + pad && Math.abs(y - DECK.cy) <= DECK.d / 2 + pad; }
-function groundAt(x, y) { // terrain, plus the level terrace
-  return inDeck(x, y) ? Math.max(hAt(x, y), DECK.top) : hAt(x, y);
+function groundAt(x, y) { // terrain, plus the level terrace, plus raised footpaths, the mandir apron and the median
+  return (inDeck(x, y) ? Math.max(hAt(x, y), DECK.top) : hAt(x, y)) + footRaise(x, y);
 }
 // sightline from the deck: anything in the southern wedge that rises above this gets kept low or cleared
 function inViewWedge(x, y) {

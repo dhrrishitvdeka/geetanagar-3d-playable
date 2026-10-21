@@ -3,6 +3,7 @@ import { scene } from '../core/context.js';
 import { P, hAt, hash2, rng } from '../core/geo.js';
 import { addCollider, normalsOf } from './geom.js';
 import { MAINP, hw, nearestOnMain } from './mainroad.js';
+import { footRaise } from './road/footpath.js';
 import { MAT, box, canvasTex, std } from './materials.js';
 import { facadeMaterials } from './bldg/facades.js';
 import { MeshBuilder } from './bldg/mesh.js';
@@ -32,7 +33,7 @@ function kiosk(x, y, ang, body, name, signBg, signFg) {
   const sign = new THREE.Mesh(new THREE.BoxGeometry(W + 0.4, 0.55, 0.06), [bm, bm, bm, bm, new THREE.MeshStandardMaterial({ map: kioskTex(name, signBg, signFg) }), bm]);
   sign.position.set(0, H + 0.48, D / 2 + 0.55); g.add(sign);
   const stool = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.45, 10), std('#2f6fb3')); stool.position.set(W / 2 + 0.5, 0.22, D / 2 + 0.3); g.add(stool);
-  g.position.set(x, hAt(x, y), -y); g.rotation.y = ang; g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  g.position.set(x, hAt(x, y) + footRaise(x, y), -y); g.rotation.y = ang; g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
   scene.add(g);
   const c = Math.cos(ang), s = Math.sin(ang), pts = [[-W / 2, -D / 2], [W / 2, -D / 2], [W / 2, D / 2], [-W / 2, D / 2]].map(([u, v]) => [x + u * c + v * s, y + u * s - v * c]);
   // local z (toward the road) maps to -y in world when ang = 0

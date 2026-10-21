@@ -2,6 +2,7 @@ import { camera, scene, stage } from '../core/context.js';
 import { clsAt } from '../core/geo.js';
 import { findOpen, player as walker, walkable } from '../ui/controls.js';
 import { deckBlocked, groundAt } from '../world/deck.js';
+import { footRaise } from '../world/road/footpath.js';
 import { blockedBySeg } from '../world/geom.js';
 import { on, emit } from './core/bus.js';
 import { state } from './core/state.js';
@@ -20,7 +21,7 @@ import { flash, isUIBlocking, toast } from './hud.js';
 // the sensitivity setting, clamp pitch, and mirror the character position into walker.x / walker.y for grass, labels and the terrace.
 const WALK = 3.0, SPRINT = 6.6, SPEED_BUFF = 1.25, ACCEL = 14, TURN = 10;       // m/s, m/s, x, 1/s, rad/s
 const CROUCH_SPEED = 0.45, CROUCH_DROP = 0.5, TURN_GAIN = 8, TURN_LAG = 22;       // x walk speed; metres the eye drops; body yaw eases toward the heading (gain 1/s, lag 1/s) instead of snapping
-const JUMP_V = 4.2, GRAV = 14, SLOPE = 1.2;
+const JUMP_V = 4.2, GRAV = 14, SLOPE = 1.2, KERB_STEP = 0.45; // KERB_STEP: the highest kerb a person steps up (above the footpath's 0.4 m); STEP below is the footstep sound
 const STAM_DRAIN = 0.16, STAM_REGEN = 0.12, STAM_RESUME = 0.2;
 const CAM = { dist: 4, min: 2.2, max: 9, head: 1.55, eye: 1.58, ground: 0.35, steps: 8, pitch3: [-0.85, 0.5], pitch1: 1.3 };
 // the rider sits a little above and behind the vehicle origin; tweak here for different models
@@ -76,8 +77,8 @@ function othersBlock(nx, ny, ox, oy, rn, ra, rv, ignore) {
 }
 function canStand(nx, ny, ox, oy, h0) {
   if (!walkable(nx, ny) || deckBlocked(nx, ny, h0)) return false;
-  const dist = Math.hypot(nx - ox, ny - oy) || 1;
-  if ((groundAt(nx, ny) - h0) / dist >= SLOPE) return false;
+  const dist = Math.hypot(nx - ox, ny - oy) || 1, dr = footRaise(nx, ny) - footRaise(ox, oy); // a kerb is a step, not a slope: judge the terrain without it
+  if (dr > KERB_STEP || (groundAt(nx, ny) - h0 - dr) / dist >= SLOPE) return false;
   return !othersBlock(nx, ny, ox, oy, 0.45, 0.5, 0.5, null);
 }
 function canRide(nx, ny, ox, oy, h0, v, dirSign) { // a wider footprint, with a probe at the nose in the direction of travel
@@ -88,7 +89,7 @@ function canRide(nx, ny, ox, oy, h0, v, dirSign) { // a wider footprint, with a 
   const startedClear = walkable(ox, oy) && !blockedBySeg(ox, oy, RIDE.radius);
   if (startedClear && (!walkable(nx + hx, ny + hy) || blockedBySeg(nx, ny, RIDE.radius))) return false;
   const dist = Math.hypot(nx - ox, ny - oy) || 1;
-  if ((groundAt(nx, ny) - h0) / dist >= SLOPE) return false;
+  if ((groundAt(nx, ny) - h0) / dist >= SLOPE || footRaise(nx, ny) - footRaise(ox, oy) > 0.1) return false; // wheels climb a footpath's ramped ends, never its kerb
   return !othersBlock(nx, ny, ox, oy, RIDE.radius, RIDE.radius, RIDE.radius, v);
 }
 

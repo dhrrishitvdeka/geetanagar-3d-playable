@@ -26,6 +26,17 @@ const TEX = {
     g.fillStyle = 'rgba(60,55,50,0.35)'; for (let i = 0; i < 40; i++) g.fillRect(r() * w, r() * h, 3 + r() * 10, 2 + r() * 6);
     speckle(g, w, h, 3000, ['rgba(0,0,0,0.15)', 'rgba(255,255,255,0.12)']);
   }),
+  footSlab: canvasTex(256, 256, (g, w, h) => { // grey concrete slab footpath, 1 m per tile (world UV = 1): a joint every metre, wear and speckle
+    const r = rng(12);
+    g.fillStyle = '#bdb9af'; g.fillRect(0, 0, w, h);
+    for (let i = 0; i < 60; i++) { g.fillStyle = r() < 0.5 ? 'rgba(90,84,74,0.10)' : 'rgba(235,230,220,0.12)'; g.beginPath(); g.ellipse(r() * w, r() * h, 10 + r() * 40, 8 + r() * 24, r() * 3, 0, 7); g.fill(); }
+    speckle(g, w, h, 3500, ['#9d998f', '#cfcbc1', '#a8a398', '#8f8b82']);
+    g.fillStyle = '#8a867d'; g.fillRect(0, 0, 4, h); g.fillRect(0, 0, w, 4);
+  }),
+  speedBreaker: canvasTex(64, 8, (g, w, h) => { // yellow and black bands across a speed breaker: one repeat = 0.7 m along the road
+    g.fillStyle = '#e8b81c'; g.fillRect(0, 0, w / 2, h); g.fillStyle = '#1d1e20'; g.fillRect(w / 2, 0, w / 2, h);
+    speckle(g, w, h, 60, ['rgba(110,92,70,0.35)', 'rgba(0,0,0,0.2)']);
+  }),
   kerb: canvasTex(256, 32, (g, w, h) => { // the black-and-white painted kerb seen all along Mother Teresa Rd
     for (let x = 0; x < w; x += 64) { g.fillStyle = '#e9e8e2'; g.fillRect(x, 0, 32, h); g.fillStyle = '#1f2124'; g.fillRect(x + 32, 0, 32, h); }
     speckle(g, w, h, 900, ['rgba(120,100,80,0.35)', 'rgba(0,0,0,0.25)']);
@@ -64,6 +75,8 @@ const M = {
   laneDust: null,
   edge: new THREE.MeshStandardMaterial({ color: '#b6b0a2', roughness: 0.95, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }),
   paver: new THREE.MeshStandardMaterial({ map: TEX.paver, roughness: 0.9, side: THREE.DoubleSide }),
+  speedBreaker: new THREE.MeshStandardMaterial({ map: TEX.speedBreaker, roughness: 0.85, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 }),
+  footSlab: new THREE.MeshStandardMaterial({ map: TEX.footSlab, roughness: 0.95, side: THREE.DoubleSide }),
   kerb: new THREE.MeshStandardMaterial({ ...PBR.kerb, bumpScale: 1, roughness: 1, side: THREE.DoubleSide }),
   kerbGreen: new THREE.MeshStandardMaterial({ ...PBR.kerbGreen, bumpScale: 1, roughness: 1, side: THREE.DoubleSide }),
   concrete: new THREE.MeshStandardMaterial({ ...PBR.concrete, bumpScale: 1.5, roughness: 1 }),

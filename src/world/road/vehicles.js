@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { scene } from '../../core/context.js';
 import { hAt } from '../../core/geo.js';
+import { footRaise } from './footpath.js';
 
 // ---------- vehicles: each kind is modelled once, baked to one geometry per material, then instanced ----------
 // Local frame: +x = forward, +y = up, z = across (+z is the vehicle's right... left-hand traffic: the kerb side is -z).
@@ -276,7 +277,7 @@ const QUEUE = {}; let pending = false;
 const PLACED = []; // every vehicle placed so far ({ kind, x, y, ang }); the game turns the parked ones into colliders
 function addVehicle(kind, x, y, ang, color = '#ffffff', lift = 0.06) {
   PLACED.push({ kind, x, y, ang });
-  (QUEUE[kind] = QUEUE[kind] || []).push([x, hAt(x, y) + lift, y, ang, new THREE.Color(color)]);
+  (QUEUE[kind] = QUEUE[kind] || []).push([x, hAt(x, y) + footRaise(x, y) + lift, y, ang, new THREE.Color(color)]);
   if (!pending) { pending = true; queueMicrotask(flushVehicles); }
 }
 function flushVehicles() {

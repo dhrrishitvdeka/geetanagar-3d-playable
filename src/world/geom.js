@@ -27,7 +27,8 @@ function strip(pts, offA, offB, yA, yB, worldUV = 4, along = false) {
     const oa = typeof offA === 'function' ? offA(i) : offA, ob = typeof offB === 'function' ? offB(i) : offB;
     const ax = p[0] + n[i][0] * oa, ay = p[1] + n[i][1] * oa, bx = p[0] + n[i][0] * ob, by = p[1] + n[i][1] * ob;
     const ha = hAt(ax, ay), hb = hAt(bx, by);
-    pos.push(ax, ha + yA, -ay, bx, hb + yB, -by);
+    const ya = typeof yA === 'function' ? yA(i) : yA, yb = typeof yB === 'function' ? yB(i) : yB; // heights may follow the point index (raised footpaths with sloped ends)
+    pos.push(ax, ha + ya, -ay, bx, hb + yb, -by);
     if (along) uv.push(s / worldUV, 0, s / worldUV, 1); else uv.push(ax / worldUV, ay / worldUV, bx / worldUV, by / worldUV);
     if (i) { const k = (i - 1) * 2; idx.push(k, k + 2, k + 1, k + 1, k + 2, k + 3); }
   });

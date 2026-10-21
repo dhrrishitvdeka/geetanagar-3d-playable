@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GEO, clsAt, hAt, hash2, pointInPoly, rng } from '../core/geo.js';
 import { addCollider, mergeAdd, resample } from './geom.js';
 import { laneWidth } from './streets.js';
-import { HAT, MAINP, MAIN_JUNC, NRM, RF, edgeKind, hw, nearestOnMain } from './mainroad.js';
+import { HAT, MAINP, MAIN_JUNC, NRM, RF, buildFootRails, edgeKind, hw, nearestOnMain } from './mainroad.js';
 import { TEX, canvasTex, speckle } from './materials.js';
 import OVERRIDES from '../../data/buildings_overrides.json';
 
@@ -378,6 +378,7 @@ export function buildCompoundWalls() {
   st.ms = Math.round(performance.now() - t0);
   st.lanes = buildLaneWalls(GEO.roads.map(r => ({ P: resample(r.p, 2), w: laneWidth(r), name: r.name })).filter(l => l.P.length >= 2));
   console.info(`[compound] ${st.runs} runs, ${st.pieces} wall pieces, ${st.segments} segments, wall length N ${st.len.N.toFixed(0)} m / S ${st.len.S.toFixed(0)} m, ${st.gates} gates (${st.open} open), ${st.booths} gatehouses; segments inside skip zones: ${st.inSkip}; segments with commercial pixels 1-4 m behind: ${st.shopBehind}; skipped samples ${JSON.stringify(st.skip)}; ${st.ms} ms`);
+  buildFootRails(GATE_POSTS); // the raised footpaths' railing opens at the gates on the road, so it waits for the full list
   return st;
 }
 export { WALL_FACES, GATE_POSTS, PIL };

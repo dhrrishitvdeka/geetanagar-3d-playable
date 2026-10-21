@@ -35,6 +35,14 @@
   },
   "median_gaps": [],
   "median_gaps_note": "No U-turn gaps were seen on any checked pano from x -470 to x 110, including opposite Geeta Nagar Rd (x ~ 62-71), which was checked looking across the median (verified absent).",
+  "crossings": [
+    { "x": -497, "name": "Hatigarh Chariali", "status": "verified" },
+    { "x": -61.5, "name": "bus stand", "status": "estimated", "note": "a few metres west of the shelter (x -57) so the north end clears the field railing at x -58" },
+    { "x": -20, "name": "field gate", "status": "estimated" },
+    { "x": 49.5, "name": "mandir stairs", "status": "verified" }
+  ],
+  "crossings_note": "Owner, Oct 2026: footpaths are raised and the railings and median have openings where people cross. Each crossing opens the edge railings and cuts the median (kerb and railing) 2 m wide.",
+  "speed_breakers": [ { "x": -39, "status": "estimated", "note": "pano sCZlwXI8DCLdW4cX6NYv7A (x -27) looking west, ~12 m ahead; yellow-and-black hump across both carriageways" } ],
   "junctions": [
     {
       "x": -518,
@@ -279,10 +287,10 @@
   ],
   "street_lights_note": "Twin-arm median lights were only seen around the field (spacing ~41 m); the others extend that spacing. West of x -180 no median lights were visible on the panos checked, only single-arm lights on the north poles.",
   "high_mast": {
-    "x": 14,
+    "x": -45,
     "side": "N",
     "status": "estimated",
-    "note": "brief says there is a high-mast light near the field; it was NOT visible on the panos at x -24 (looking N/NE) or x 47, so the position is a guess"
+    "note": "seen inside the field from pano sCZlwXI8DCLdW4cX6NYv7A (x -27) heading 330"
   },
   "signals": [
     {

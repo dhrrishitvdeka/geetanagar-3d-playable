@@ -180,6 +180,7 @@ function stepVeh(v, dt, P) {
   // speed limit: slow through Hatigarh, slow in bends and during a U-turn
   let tgt = v.vmax;
   if (R.main) { const ax = Math.abs(v.x - HAT.x); if (ax < 35) tgt *= ax < 15 ? 0.4 : 0.4 + 0.6 * (ax - 15) / 20; }
+  if (R.main) for (const b of RF.speed_breakers) tgt = Math.min(tgt, 3.5 + (v.vmax - 3.5) * Math.min(1, Math.max(0, (Math.abs(v.x - b.x) - 10) / 10))); // crawl over a speed breaker: 3.5 m/s within 10 m, easing back out to 20 m
   tgt = Math.min(tgt, Math.max(2.5, v.vmax * (1 - Math.min(1, Math.abs(v.dh) / 1.1))));
   if (v.turn > 0) tgt = Math.min(tgt, 2.5);
   if (v.kind === 'bus' && R.main) { // ease in to the stop, wait with the door open, then pull away
