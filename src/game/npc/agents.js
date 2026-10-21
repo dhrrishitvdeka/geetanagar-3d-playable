@@ -337,6 +337,14 @@ function behave(n, dt) {
       break;
     }
     case 'football': football(n, dt); break;
+    case 'dance': { // Bihu: a slow ring round the anchor, a few steps then a sway on the spot; realpool raises the arms (n.dancing)
+      const a = n.anchor || { x: n.x, y: n.y, r: 4 }; n.dancing = true; n.t1 = (n.t1 || 0) + dt;
+      const beat = n.t1 % 2.4, ang = Math.atan2(n.y - a.y, n.x - a.x) + (beat < 1.5 ? 0.35 : 0);
+      if (beat < 1.5) want(a.x + Math.cos(ang) * a.r, a.y + Math.sin(ang) * a.r, 0.75, false);
+      else n.faceT = aim(n, a.x + Math.cos(ang + 1.2) * a.r, a.y + Math.sin(ang + 1.2) * a.r); // turn half toward the centre while swaying
+      n.lookOn = true; n.lookX = a.x; n.lookY = a.y; n.lookZ = n.z + 1.4;
+      break;
+    }
     case 'sit': break;
     default: break; // idle
   }

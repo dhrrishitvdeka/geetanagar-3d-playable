@@ -17,7 +17,7 @@ const FI = { Idle_Loop: 0.3, Walk_Loop: 0.25, Walk_Formal_Loop: 0.25, Jog_Fwd_Lo
 const SYNC = new Set(['Walk_Loop', 'Walk_Formal_Loop', 'Jog_Fwd_Loop', 'Sprint_Loop', 'Crouch_Fwd_Loop']); // gait loops share one phase so blending between them keeps the feet in step
 const ONCE = new Set(['Jump_Start', 'Jump_Land', 'Sitting_Enter', 'Sitting_Exit', 'Hit_Chest']);
 const JS = { from: 0.07, ts: 1.5, end: 0.75 }, JL = { ts: 1.7, end: 0.85 }, KICK_T = 0.5, PICK_T = 0.85; // jump start / land: clip time to start at, speed, clip time to stop at
-const AXB = ['upperarm_r', 'thigh_r', 'thigh_l', 'calf_r', 'calf_l', 'pelvis', 'spine_01', 'spine_03', 'neck_01', 'Head', 'clavicle_l', 'clavicle_r'];
+const AXB = ['upperarm_r', 'upperarm_l', 'lowerarm_r', 'lowerarm_l', 'hand_r', 'hand_l', 'thigh_r', 'thigh_l', 'calf_r', 'calf_l', 'pelvis', 'spine_01', 'spine_03', 'neck_01', 'Head', 'clavicle_l', 'clavicle_r'];
 const CK = { stance: 0, arm: 1, shoulder: 2, finger: 3 };
 // per state: blend weight of each correction [stance, arm, shoulder, finger]
 const CW = { crouch: [0, 0.5, 0.5, 0.5], idle: [1, 1, 1, 0.55], talk: [1, 1, 1, 0.55], walk: [0.35, 0.7, 1, 0.55], run: [0, 0.3, 0.5, 0.3], sit: [0, 0.7, 1, 0.55], floor: [0, 0.5, 0.5, 0.5], wave: [0.5, 0, 0.3, 0.15], pray: [0.5, 0, 0.3, 0.15] }, CW_DEF = [0, 0.3, 0.5, 0.4];
@@ -462,7 +462,7 @@ function makeRealCharacter(appearance = {}, opts = {}) {
   const pivot = new THREE.Group(); pivot.rotation.y = Math.PI / 2; group.add(pivot); // the models face +z, the game wants +x
   const rigs = { male: null, female: null }; let rig = null, A = DEF, sc = 1, stT = 0, lastSt = '', formal = false;
   let ph = Math.random(), jm = 0, jt = 0, sm = 0, sst = 0, pAir = false, pSit = false; // gait phase; jump mode (1 start, 2 loop, 3 land) and clock; sit mode (1 down, 2 seated, 3 up) and clock
-  let bt = Math.random() * 20, bph = Math.random() * 6.28, lookT = 0, lty = 0, ltp = 0, ly = 0, lp = 0; // breathing clock and phase, head look timer, target and current yaw / pitch
+  let dnT = Math.random() * 6, bt = Math.random() * 20, bph = Math.random() * 6.28, lookT = 0, lty = 0, ltp = 0, ly = 0, lp = 0; // breathing clock and phase, head look timer, target and current yaw / pitch
   const rigOf = g => { if (!rigs[g]) { rigs[g] = makeRig(TPL[g]); pivot.add(rigs[g].root); } return rigs[g]; };
   function setAppearance(app) {
     const a = { ...DEF, ...app }, female = !!a.female; A = a;
@@ -578,6 +578,12 @@ function makeRealCharacter(appearance = {}, opts = {}) {
       R('pelvis', 'z', 0.022 * Math.sin(bt * 0.42 + bph) * ik); R('spine_01', 'z', -0.015 * Math.sin(bt * 0.42 + bph) * ik);
     }
     if (pk > 0.01) { R('spine_01', 'x', sg.lean * 0.08 * pk); R('spine_03', 'x', sg.lean * 0.12 * pk); R('upperarm_r', 'x', sg.arm * 1.0 * pk); R('Head', 'x', -sg.lean * 0.2 * pk); }
+    if (o.dance && (state === 'idle' || state === 'walk')) { // Bihu: arms up and out, wrists turning, hips swaying to the dhol
+      dnT += dt; const sw = Math.sin(dnT * 4.2), up = 0.7 + 0.15 * Math.sin(dnT * 2.1);
+      R('upperarm_l', 'x', sg.arm * 1.15 * up); R('upperarm_r', 'x', sg.arm * 1.15 * up); R('upperarm_l', 'z', 0.35 + 0.1 * sw); R('upperarm_r', 'z', -0.35 + 0.1 * sw);
+      R('lowerarm_l', 'x', sg.arm * 0.5); R('lowerarm_r', 'x', sg.arm * 0.5); R('hand_l', 'y', 0.6 * sw); R('hand_r', 'y', -0.6 * sw);
+      R('pelvis', 'z', 0.09 * sw); R('spine_01', 'z', -0.06 * sw); R('spine_03', 'x', -sg.lean * 0.05);
+    }
     if (state === 'kick' && stT < KICK_T) { // backswing (foot back, shin cocked), whip the leg through to the ball at ~0.2 s, follow through, recover; the torso leans back into it
       const p = stT / KICK_T, bk = smooth(0, 0.28, p), sw = smooth(0.28, 0.46, p), e = 1 - smooth(0.64, 1, p);
       R('thigh_r', 'x', sg.hip * (-0.4 * bk * (1 - sw) + 1.3 * sw) * e); R('calf_r', 'x', sg.knee * (1.25 * bk * (1 - sw) + 0.15 * sw) * e);

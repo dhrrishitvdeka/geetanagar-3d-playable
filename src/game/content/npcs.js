@@ -47,12 +47,16 @@ const A = {
   bahadur: { skin: '#c99a74', hair: '#14100d', hairStyle: 'short', top: '#a89968', topStyle: 'uniform', bottom: '#6b5d3f', bottomStyle: 'pants', hat: 'cap', height: 1.02, build: 1.12 },
   kakati: { skin: '#9b6a46', hair: '#c8c3ba', hairStyle: 'short', top: '#8a8f6a', topStyle: 'shirt', bottom: '#4b4f58', bottomStyle: 'pants', hat: 'topi', bag: '#6b4a2c', height: 0.99, build: 0.95 },
   anjali: { skin: '#b07a52', hair: '#1c1612', hairStyle: 'long', top: '#e07b9b', topStyle: 'tshirt', bottom: '#2c3e6a', bottomStyle: 'pants', bag: '#2f2f33', height: 0.97 },
+  nabin: { skin: '#9c6744', hair: '#1a1410', hairStyle: 'short', top: '#efe3c4', topStyle: 'kurta', bottom: '#3a3f48', bottomStyle: 'pants', gamosa: true, hat: 'japi', height: 1.01 },
   bhaiti: { skin: '#9a6540', hair: '#1a1410', hairStyle: 'short', top: '#f2f2f2', topStyle: 'shirt', bottom: '#2f2f3a', bottomStyle: 'pants', bag: '#7a4a2a', height: 1.0 },
 };
 
 // ---------- the cast ----------
 // shop: shop id for the "Buy something" choice; chat: rotating small talk (one or two lines each, with hints); greet: first line
 const NAMED = [
+  { id: 'nabin', name: 'Nabin Da', role: 'organiser', title: 'Bihu committee', x: -21.5, y: -34.5, face: face(-26, -45), behavior: 'pace', anchor: { x: -21.5, y: -34.5, r: 2.5 }, appearance: A.nabin,
+    lines: ['Bihu waits for nobody, and neither does the committee.', 'Dhol, pepa, gogona: we have all of it. What we never have is enough hands.'],
+    chat: [['Rongali Bihu is the spring Bihu, when the new year starts and the fields get ready. Everybody dances, even the ones who say they cannot.'], ['My father played the dhol for this field for thirty years. I only organise. Somebody has to carry the chairs.'], ['The pepa is a buffalo-horn pipe. When you hear it, you will know the Bihu has started.']] },
   { id: 'dadu', name: 'Dadu', role: 'elder', title: 'retired teacher', x: -24.5, y: -37.5, face: face(-24.5, -20), behavior: 'sit', anchor: { x: -24.5, y: -37.5, r: 1.5 }, appearance: A.dadu,
     lines: ['Mind the cyclists, beta. They never ring the bell.', 'I taught half this neighbourhood to read a map.'],
     chat: [['The field was a swamp when I was your age. We drained it ourselves, with buckets and bad jokes.'], ['Every sunrise I count the crows on the wall. Eleven today. A good number.'], ['Walk the whole road once, from the mandir to Hatigarh. Then you will know Geetanagar.']] },

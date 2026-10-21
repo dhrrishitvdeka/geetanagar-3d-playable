@@ -93,6 +93,7 @@ const SFX = {
     if (dbl) { beep(t, 0.16); beep(t + 0.26, 0.2); return 0.7; } beep(t, rnd(0.3, 0.5)); return 0.7;
   },
   clank(t, out, p) { tone(out, 'triangle', 1850 * p, 1500, t, 0.18, 0.35, 0.001); tone(out, 'sine', 2950 * p, 0, t, 0.12, 0.18, 0.001); noise(out, t, 0.04, 'highpass', 3000, 3000, 0.8, 0.5, 0.001); return 0.22; },
+  dhol(t, out, p) { tone(out, 'sine', 95 * p, 52, t, 0.32, 1.2, 0.002); noise(out, t, 0.05, 'bandpass', 900 * p, 400, 1.2, 0.9, 0.001); tone(out, 'triangle', 190 * p, 120, t, 0.12, 0.35, 0.002); return 0.36; }, // a dhol stroke: low skin, slap, a little ring
   kick(t, out, p) { tone(out, 'sine', 160 * p, 42, t, 0.28, 1.1, 0.002); noise(out, t, 0.06, 'lowpass', 1100, 500, 0.8, 1.2, 0.002); return 0.35; },
   goal(t, out, p) { // crowd cheer: three noise bands swelling, with a rough flutter, and a whistle over the top
     for (const [f, q, pk] of [[520, 0.7, 2.2], [1050, 0.8, 2.6], [2300, 0.9, 1.4]]) {

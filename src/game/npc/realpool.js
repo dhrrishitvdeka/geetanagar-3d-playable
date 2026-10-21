@@ -5,7 +5,7 @@ import { makeRealCharacter, realReady } from './realchars.js';
 
 // ---------- rigged models for the people nearest the camera ----------
 // A fixed pool of real-model slots (6 / 12 / 16 by quality tier). Every ~0.25 s the nearest people within ~45 m get a slot, named
-// people first (within 70 m) and anyone mid-conversation before everyone else. A person who already holds a slot keeps it a little
+// people favoured (as if 20 m nearer, and reached out to 70 m) and anyone mid-conversation before everyone else. A person who already holds a slot keeps it a little
 // longer than a newcomer would get one (distance bonus plus a wider keep radius), so nobody flickers between models. An assigned NPC
 // has n.real = true, which makes crowd.js skip it; its slot model then follows n.x / n.z / n.y / n.heading / n.state / n.speed.
 // A slot is reconfigured (appearance only, no new meshes) when it moves to another person or the person's recipe changes (recycled
@@ -13,7 +13,7 @@ import { makeRealCharacter, realReady } from './realchars.js';
 const SLOTS = { low: 6, medium: 12, high: 16 }[QUALITY] || 12;
 const RANGE = 45, NAMED_RANGE = 70, KEEP = 10, EVERY = 0.25, CULL_R = 3.5, FAR = 25, FAR_DT = 0.05;
 const pool = [], selN = new Array(SLOTS).fill(null), selS = new Float32Array(SLOTS);
-const ANIM = { state: 'idle', speed: 0, seated: false, restart: false, look: NaN, lookP: 0, seatH: 0 };
+const ANIM = { state: 'idle', speed: 0, seated: false, restart: false, look: NaN, lookP: 0, seatH: 0, dance: false };
 const frustum = new THREE.Frustum(), vp = new THREE.Matrix4(), sph = new THREE.Sphere();
 let built = false, off = false, timer = 0, stamp = 0;
 
@@ -36,7 +36,7 @@ function reassign(list, count, cx, cz) {
     const n = list[q]; if (n.dead || n.hidden || !n.recipe) continue;
     const dx = n.x - cx, dy = n.y + cz, named = n.kind === 'named', lim = (named ? NAMED_RANGE : RANGE) + (n.real ? KEEP : 0);
     if (dx * dx + dy * dy > lim * lim) continue;
-    const score = Math.sqrt(dx * dx + dy * dy) - (named ? 100 : 0) - (n.talking ? 200 : 0) - (n.real ? 6 : 0);
+    const score = Math.sqrt(dx * dx + dy * dy) - (named ? 20 : 0) - (n.dancing ? 10 : 0) - (n.talking ? 200 : 0) - (n.real ? 6 : 0); // named people count as 20 m nearer, dancers 10 m: a person right in front of you still wins over one far down the road
     if (ns === SLOTS && score >= selS[ns - 1]) continue;
     let k = ns < SLOTS ? ns++ : SLOTS - 1;
     while (k > 0 && selS[k - 1] > score) { selS[k] = selS[k - 1]; selN[k] = selN[k - 1]; k--; }
@@ -68,7 +68,7 @@ function updateRealPool(list, count, dt) {
       const vis = frustum.intersectsSphere(sph); g.visible = vis;
       if (!vis) { s.acc = 0; continue; }
       s.acc += dt; if (d2 > near2 && s.acc < FAR_DT) continue; // distant people animate at ~20 Hz
-      ANIM.state = n.state; ANIM.speed = n.speed; ANIM.seated = n.behavior === 'sit' && !n.goto; ANIM.seatH = ANIM.seated ? n.seatH || 0 : 0;
+      ANIM.state = n.state; ANIM.speed = n.speed; ANIM.seated = n.behavior === 'sit' && !n.goto; ANIM.seatH = ANIM.seated ? n.seatH || 0 : 0; ANIM.dance = !!n.dancing;
       if (n.state === 'idle' && Math.abs(n.hv || 0) > 1.1) { ANIM.state = 'walk'; ANIM.speed = 0.7; } // turning on the spot: shuffle the feet round instead of spinning on them
       ANIM.look = NaN; // head target as yaw relative to the body (+ = to the left) and pitch (+ = up); NaN = no target, the idle glances run
       if (n.lookOn) { const lx = n.lookX - n.x, ly = n.lookY - n.y, rel = Math.atan2(Math.sin(Math.atan2(ly, lx) - n.heading), Math.cos(Math.atan2(ly, lx) - n.heading));

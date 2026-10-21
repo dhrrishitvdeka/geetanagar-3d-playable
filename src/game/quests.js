@@ -4,9 +4,9 @@ import { GATE } from '../world/park.js';
 import { fieldGateX } from '../world/road/fieldedge.js';
 import { findOpen, walkable } from '../ui/controls.js';
 import { emit, on } from './core/bus.js';
-import { addItem, addMoney, discover, hasItem, removeItem, setFlag, state } from './core/state.js';
-import { getNPC, npcSay, npcSetBehavior } from './npc/agents.js';
-import { bigMessage, setObjectiveTarget, setQuestTracker, toast } from './hud.js';
+import { addItem, addMoney, clockText, discover, hasItem, itemCount, removeItem, setFlag, state } from './core/state.js';
+import { addSpot, getNPC, npcSay, npcSetBehavior } from './npc/agents.js';
+import { bigMessage, fade, setObjectiveTarget, setQuestTracker, toast } from './hud.js';
 import { addMarker, removeMarker } from './map.js';
 import { clearWorldMarker, getBall, getDelivery, setBallPosition, setScooterUnlocked, setWorldMarker, startDelivery } from './worldobjects.js';
 import { SHOPS } from './items.js';
@@ -15,7 +15,7 @@ import { sfx } from './audio.js';
 import { addBuff } from './player.js';
 import { PLACES, PLACE_BY_ID } from './content/places.js';
 import { Aborted, BY_ID, FIELD_ANCHOR, FIELD_C, NAMED, TALK, ask, chat, say, sayAll, shopTalk, spawnNamedNPCs } from './content/npcs.js';
-import { initShopkeepers } from './content/shopkeepers.js';
+import { initShopkeepers, nearestShop } from './content/shopkeepers.js';
 
 // ---------- quest engine ----------
 // state.quests[id] = { status: 'active' | 'done', step, data }. A quest is a list of steps; a step may have
@@ -167,6 +167,16 @@ function kids(playing) { // while the ball is lost the boys stand about waiting;
   for (const id of ['rinku', 'moni', 'bablu']) { try { npcSetBehavior(id, playing ? 'play' : 'idle', { anchor: { ...FIELD_ANCHOR } }); } catch (e) { /* npc module not ready */ } }
 }
 
+// ---------- Rongali Bihu: the evening dance on the field ----------
+const BIHU_AT = 16.5, DANCE = { x: -26.4, y: -28.7, r: 4.6 }; // 4:30 pm, a ring on the field near the gate (clear of the goalmouths), Dadu watches from his chair
+const PITHA_FOR_GUESTS = 2;
+const BIHU_WEAR = new Set(['mekhela_muga', 'mekhela_pat', 'dhoti_kurta']);
+const bihuDressed = () => (!!state.wear && BIHU_WEAR.has(state.wear.id)) || (!!state.look && state.look.bottomStyle === 'mekhela');
+const bihuEvening = () => state.time >= BIHU_AT;
+const danceOn = () => bihuEvening() && (isDone('rongali_bihu') || (isActive('rongali_bihu') && qs('rongali_bihu').step >= 3));
+let dholT = 0, dholK = 0;
+function dressShop() { const b = nearestShop('NEW ASSAM DRESSES', -480, -70); return b ? { x: b.fx, y: b.fy } : { x: -474, y: -86 }; } // the big one by Hatigarh
+
 // ---------- the quests ----------
 def({ id: 'morning_sah', title: "Dadu's morning tea", reward: 30, hint: 'Say hello to Dadu by the field',
   desc: "Dadu cannot start his morning without a glass of lal sah. Fetch one from Bina Baideu's stall and learn how to get around.",
@@ -234,6 +244,20 @@ def({ id: 'eyes_on_city', title: 'Eyes on the city', reward: 50, giver: 'kakati'
   steps: [
     { text: 'Talk to Kakati Khura at the View point', t: tNpc('kakati'), done: () => true, quiet: true },
     { text: q => `Spot ${SPOTS_3.filter(s => !q.data.seen.includes(s)).map(s => SPOT_NAME[s]).join(', ')} through the binoculars (${q.data.seen.length}/3)`, t: tPt(DECK.cx, DECK.cy - 2, 'View point'), done: q => q.data.seen.length >= 3 },
+  ] });
+
+def({ id: 'rongali_bihu', title: 'Rongali Bihu', reward: 120, giver: 'nabin', available: () => isDone('morning_sah'), hint: 'Help Dadu first, then find Nabin Da at the field gate',
+  big: ['Rongali Bihu!', 'You danced Bihu on Geetanagar Field'],
+  desc: 'Tonight the neighbourhood dances Bihu on the field. Nabin Da of the Bihu committee needs til pitha for the guests, and everyone on the field should be dressed for it: a mekhela sador, or a dhoti and kurta with a gamosa.',
+  onComplete: () => { npcSay('nabin', 'Bihu-r xubhessa! Happy Bihu! You dance like you were born on this field.', 5000); npcSay('dadu', 'Forty Bihus I have watched from here. This one was a good one.', 5000); },
+  steps: [
+    { text: 'Talk to Nabin Da at the field gate', t: tNpc('nabin'), done: () => true, quiet: true },
+    { text: () => `Get ready for Bihu: ${bihuDressed() ? 'dressed for it' : 'buy a mekhela sador or a dhoti and kurta at New Assam Dresses by Hatigarh, and wear it'} · til pitha ${Math.min(PITHA_FOR_GUESTS, itemCount('pitha'))}/${PITHA_FOR_GUESTS}`,
+      t: (q, o) => { if (!bihuDressed()) { const s = dressShop(); o.x = s.x; o.y = s.y; o.label = 'New Assam Dresses'; } else { const n = getNPC('rupa') || BY_ID.rupa; o.x = n.x; o.y = n.y; o.label = 'Til pitha: Rupa Khuri'; } return true; },
+      done: () => bihuDressed() && itemCount('pitha') >= PITHA_FOR_GUESTS },
+    { text: 'Bring the til pitha to Nabin Da, dressed for Bihu', t: tNpc('nabin'), back: () => !bihuDressed() || itemCount('pitha') < PITHA_FOR_GUESTS },
+    { text: () => (bihuEvening() ? 'The Bihu has started! Join the circle on the field' : `Come to the field for the Bihu dance at 4:30 pm (it is ${clockText()})`), t: tPt(DANCE.x, DANCE.y, 'Bihu dance'),
+      done: () => danceOn() && Math.hypot(pl.x - DANCE.x, pl.y - DANCE.y) < DANCE.r + 3 },
   ] });
 
 def({ id: 'parcel_run', title: 'Parcel run', reward: 0, giver: 'dipen', repeatable: true, quiet: true, noMarker: true, hideTracker: true, hint: 'Talk to Dipen at the Hatigarh stalls',
@@ -315,6 +339,11 @@ function updateQuests(dt, player) {
   uiAcc += dt;
   if (uiAcc >= 0.5) { uiAcc = 0; refreshMarkers(); }
   if (trackerDirty) refreshTracker();
+  // the dhol, while the Bihu is on and you are near: dha-dhin, dha-dha-dhin
+  if (danceOn() && Math.hypot(pl.x - DANCE.x, pl.y - DANCE.y) < 60 && (dholT -= dt) <= 0) {
+    const pat = [1, 0.75, 1, 1, 0.75, 0.5]; sfx('dhol', { x: DANCE.x, y: DANCE.y, pitch: pat[dholK % pat.length] > 0.9 ? 1 : 1.35, vol: pat[dholK % pat.length] });
+    dholT = dholK % 3 === 2 ? 0.48 : 0.24; dholK++;
+  }
 }
 
 // ---------- save, load, new game ----------
@@ -360,6 +389,7 @@ function getQuestLog() {
 
 // ---------- talking ----------
 const SUGGEST = [
+  ['rongali_bihu', 'And tonight is Bihu! Nabin Da of the committee is right there by the gate, running about like a hen. He could use you.'],
   ['lost_ball', 'Rinku and the boys have lost their ball again. Find them on the field, they could use a runner.'],
   ['puja_flowers', 'Purohit Sarma, up at the Mandir gate, needs marigolds for the puja. Jonali sells them at the yellow carts by the steps.'],
   ['eyes_on_city', 'Kakati Khura sits up at the View point with his binoculars. Ask him where the gamosa are hiding.'],
@@ -538,6 +568,39 @@ async function talkKhagen(npc) {
   }
 }
 
+async function talkNabin(npc) {
+  const q = qs('rongali_bihu');
+  if (!q) {
+    if (!QUESTS.rongali_bihu.available()) { await say(npc, 'Nomoskar! Busy, busy. Dadu is waiting for his tea, I think. Help him first, then come and see me.'); return; }
+    await sayAll(npc, ['Nomoskar! You must be the one who brought Dadu his tea. Good, good, I need people who finish what they start.',
+      'Tonight is the Bihu on this field. The dhol is tuned, the pepa players are practising, the chairs... I will find the chairs.',
+      'Two problems. The guests need til pitha, and half of the young people want to come in jeans!']);
+    if (await ask(npc, 'Will you help? Bring two til pitha, and come dressed for Bihu: a mekhela sador, or a dhoti and kurta.', [{ text: 'I will be there', value: 'y' }, { text: 'Not now', value: 'n' }]) === 'y') {
+      startQuest('rongali_bihu');
+      await say(npc, bihuDressed() ? 'And you are already dressed for it! Then only the pitha. Rupa Khuri at the SNACKS kiosk has the best til pitha on the road.'
+        : 'New Assam Dresses, by Hatigarh, has muga and pat mekhela sador and dhoti-kurta sets. For the pitha, Rupa Khuri at the SNACKS kiosk. Put the clothes on once you buy them, from your bag.');
+    } else await say(npc, 'Think about it. Bihu comes only three times a year, and only one of them dances.');
+    return;
+  }
+  if (q.status === 'active' && q.step === 1) { await say(npc, `${bihuDressed() ? 'You look ready.' : 'Still in everyday clothes? New Assam Dresses, by Hatigarh. Wear it from your bag.'} ${itemCount('pitha') >= PITHA_FOR_GUESTS ? 'And the pitha is here!' : `I need ${PITHA_FOR_GUESTS} til pitha from Rupa Khuri's kiosk.`}`); return; }
+  if (q.status === 'active' && q.step === 2) {
+    if (!bihuDressed() || itemCount('pitha') < PITHA_FOR_GUESTS || !isActive('rongali_bihu') || qs('rongali_bihu').step !== 2) { await say(npc, 'Almost. Dressed for Bihu and two til pitha, then we are ready.'); return; }
+    removeItem('pitha', PITHA_FOR_GUESTS); advance('rongali_bihu');
+    await sayAll(npc, ['Ahh, til pitha, still soft. The guests will be happy. And look at you! Ekdom Bihu-r saaj, proper Bihu clothes.', 'We start at half past four, when the sun gets low over the field. Right here, by the gate.']);
+  }
+  if (isActive('rongali_bihu') && qs('rongali_bihu').step === 3) {
+    if (bihuEvening()) { await say(npc, 'It has started! Go on, into the circle. Arms up, and follow the dhol.'); return; }
+    const v = await ask(npc, `It is only ${clockText()}. You can wait here with us till the evening, or go about your day.`, [{ text: 'Wait for the evening', value: 'wait' }, { text: 'I will come back', value: 'later' }]);
+    if (v === 'wait') {
+      await fade(true, 700); state.time = Math.max(state.time, BIHU_AT); dirty = true; await fade(false, 900);
+      toast('The afternoon goes by. The dhol starts up on the field.', { kind: 'quest' });
+    } else await say(npc, 'Half past four, by the gate. Do not be late, the dhol does not wait.');
+    return;
+  }
+  if (isDone('rongali_bihu')) { await say(npc, bihuEvening() ? 'Bihu every evening this week! Come and dance.' : 'Come back in the evening, there is dancing every day this week.'); return; }
+  await chat(npc);
+}
+
 async function talkBina(npc) {
   const q = qs('morning_sah');
   await shopTalk(npc, q && q.status === 'active' && q.step === 1 ? { greet: 'Dadu sent you? One lal sah coming up, hot as ever.' } : {});
@@ -553,9 +616,17 @@ function initQuests() {
   if (inited) return; inited = true;
   try { spawnNamedNPCs(); } catch (err) { console.error('[quests] spawnNamedNPCs failed', err); }
   try { initShopkeepers(); } catch (err) { console.error('[quests] shopkeepers failed', err); }
+  const MEK = [['#d6b25e', '#e2c57a', '#a01e2c'], ['#efe7d2', '#f2ebd8', '#b3202e']];
+  addSpot(DANCE.x, DANCE.y, BIHU_AT, 18, () => Array.from({ length: 8 }, (_, k) => {
+    const a = k / 8 * Math.PI * 2, woman = k % 2 === 0, [m, w, b] = MEK[(k >> 1) % 2];
+    return { role: woman ? 'mekhela' : 'commuter', x: DANCE.x + Math.cos(a) * DANCE.r, y: DANCE.y + Math.sin(a) * DANCE.r, heading: a + Math.PI / 2, behavior: 'dance', title: 'Bihu dancer',
+      anchor: { ...DANCE }, appearance: woman ? { female: true, hairStyle: 'bun', topStyle: 'blouse', top: b, bottomStyle: 'mekhela', bottom: m, wrap: w, motif: b, bag: null, umbrella: null, phone: false }
+        : { female: false, hairStyle: 'short', topStyle: 'kurta', top: '#f1e6c8', bottomStyle: 'dhoti', bottom: '#f4efe2', gamosa: true, hat: 'japi', bag: null, umbrella: null, phone: false },
+      def: { chat: [[woman ? 'Bihu-r xubhessa! Come, dance! It is only three steps, then you sway.' : 'Hold the gamosa like this, and when the dhol goes fast, so do you!']] } };
+  }), 120, danceOn);
   reg('dadu', talkDadu); reg('rinku', talkRinku); reg('moni', talkKid); reg('bablu', talkKid); reg('purohit', talkPurohit);
   reg('raju', talkRaju); reg('kakati', talkKakati); reg('anjali', talkAnjali); reg('dipen', talkDipen); reg('bahadur', talkBahadur);
-  reg('khagen', talkKhagen); reg('bina', talkBina); reg('jonali', talkJonali);
+  reg('khagen', talkKhagen); reg('bina', talkBina); reg('jonali', talkJonali); reg('nabin', talkNabin);
   // event hooks: one listener per event type; quests mutate their own data, then the next poll runs the step tests
   const events = new Set(); for (const id of ORDER) if (QUESTS[id].on) for (const ev of Object.keys(QUESTS[id].on)) events.add(ev);
   for (const ev of events) on(ev, p => {
@@ -564,7 +635,7 @@ function initQuests() {
     for (const id of ORDER) { const q = qs(id), h = QUESTS[id].on && QUESTS[id].on[ev]; if (q && q.status === 'active' && h) h(q, p); }
     dirty = true;
   });
-  for (const ev of ['shop:bought', 'inv:changed', 'item:used']) on(ev, () => { dirty = true; });
+  for (const ev of ['shop:bought', 'inv:changed', 'item:used', 'outfit:changed']) on(ev, () => { dirty = true; trackerDirty = true; });
   on('place:discovered', ({ id }) => { const i = PLACES.findIndex(p => p.id === id); if (i >= 0) found[i] = 1; });
   on('game:start', onStart);
 }
