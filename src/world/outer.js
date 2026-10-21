@@ -74,6 +74,11 @@ function buildOuter() {
   };
   gmat.customProgramCacheKey = () => 'geet-outer-ground';
   const m = new THREE.Mesh(geo, gmat); m.receiveShadow = true; scene.add(m);
+  // horizon: the 9 km square ends in a visible edge on high, where the far plane reaches 9.5 km; a flat forest-floor ring out to 9 km sits 40 m below
+  // the square's mean edge height, and the fog hides the step between them
+  { let sum = 0, n = 0; for (let k = 0; k <= 64; k++) { const t = -S / 2 + (k / 64) * S; for (const [x, y] of [[t, -S / 2], [t, S / 2], [-S / 2, t], [S / 2, t]]) { sum += outerH(x, y); n++; } }
+    const ring = new THREE.Mesh(new THREE.RingGeometry(S / 2, S, 64, 1), new THREE.MeshStandardMaterial({ color: forest, roughness: 1 }));
+    ring.rotation.x = -Math.PI / 2; ring.position.y = sum / n - 40; ring.name = 'horizon ring'; scene.add(ring); }
 
   // city blocks continuing in every direction past the traced area, in neighbourhood clusters
   const r = rng(404), boxes = [];
