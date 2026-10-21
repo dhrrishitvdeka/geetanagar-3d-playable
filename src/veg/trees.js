@@ -182,7 +182,7 @@ function updateNearTrees(force) {
   const q = quality(), P = QP[q];
   if (q !== lastQ) {
     lastQ = q; force = true;
-    for (const v in imps) { const im = imps[v]; im.castShadow = P.shadows === true; im.userData.setFast(P.fast); im.count = im.userData.nAll; }
+    for (const v in imps) { const im = imps[v]; im.castShadow = false; im.userData.setFast(P.fast); im.count = im.userData.nAll; }
     for (const v in nearSets) for (const im of nearSets[v]) im.castShadow = !!P.shadows;
     for (const id in plantSets) for (const m of plantSets[id].near) m.castShadow = !!P.shadows;
     for (const id in plantSets) for (const m of plantSets[id].far) m.castShadow = P.shadows === true && id.startsWith('coconut');
