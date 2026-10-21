@@ -132,8 +132,8 @@ function busShelter(x, y, ang) { // tiled-roof shelter on pillars with a bench; 
   add(g, box(0.6, 0.12, 5.5, std('#9b9488')), -0.9, 0.5, 0); add(g, box(0.1, 1.2, 6.2, std('#b9b1a3')), -1.4, 0.6, 0);
   put(g, x, y, ang);
 }
-function highMast(x, y) { // tall octagonal mast with a lamp ring (the high-mast light near the field)
-  const g = new THREE.Group(), H = 18;
+function highMast(x, y) { // tall octagonal mast with a lamp ring (the high-mast light inside the field, Street View pano x -27 heading 330)
+  const g = new THREE.Group(), H = 20;
   add(g, cyl(0.7, 0.7, 0.5, M.concrete, 8), 0, 0.25, 0);
   add(g, cyl(0.13, 0.3, H, M.steel, 8), 0, 0.5 + H / 2, 0);
   add(g, new THREE.Mesh(new THREE.TorusGeometry(0.9, 0.06, 6, 24), M.steel), 0, H + 0.3, 0, Math.PI / 2);

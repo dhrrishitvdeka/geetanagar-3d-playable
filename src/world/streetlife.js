@@ -177,7 +177,7 @@ function buildPoles() {
   for (const p of poles.filter(p => p.main)) if (r() < 0.45) { const c = new THREE.TorusGeometry(0.28 + r() * 0.15, 0.04, 5, 16); c.rotateY(r() * 3); c.translate(p.x + 0.2, p.z + p.h - 2.8 - r(), -p.y); cables.push(c); }
   mergeAdd(cables, std('#121212', { roughness: 0.7 }), true);
   // the high-mast light by the field (position approximate)
-  const HM = RF.high_mast, [hx, hy] = beside(HM.x, HM.side === 'N' ? 1 : -1, hw(nearestOnMain(HM.x, -56)[1]) + 2.2); highMast(hx, hy); // estimated: not seen on Street View
+  const HM = RF.high_mast, [hx, hy] = beside(HM.x, HM.side === 'N' ? 1 : -1, hw(nearestOnMain(HM.x, -56)[1]) + 6.5); highMast(hx, hy); // inside the field, behind the frontage wall (about 3.95 m beyond the right of way); the exact spot is estimated
 }
 
 export { buildHatigarh, buildTraffic, buildPoles, EXTRA_TREES, beside };
