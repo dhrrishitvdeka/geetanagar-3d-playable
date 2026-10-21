@@ -6,7 +6,7 @@ import { walkable } from '../../ui/controls.js';
 import { groundAt } from '../../world/deck.js';
 import { MAINP, NRM, asphHalf, hw, nearestOnMain } from '../../world/mainroad.js';
 import { beside } from '../../world/streetlife.js';
-import { emit } from '../core/bus.js';
+import { emit, on } from '../core/bus.js';
 import { state } from '../core/state.js';
 import { bubble, showDialogue } from '../hud.js';
 import { register, unregister } from '../interact.js';
@@ -16,6 +16,7 @@ import { Animator, buildRecipe, randomAppearance } from './humanoid.js';
 import { initRealPool, releaseReal, updateRealPool } from './realpool.js';
 import { buildNav, findPath, nearestNode, nodeXY, randomPoint, randomPointDir } from './nav.js';
 import { claimSeat, releaseSeat } from '../seats.js';
+import { FIELD, ballInField, ballRef, npcKick, pushBall } from '../worldobjects.js';
 
 // ---------- NPC simulation: ambient crowd, named people, behaviours, avoidance, talking ----------
 const TARGET = { low: 24, medium: 40, high: 64 }[QUALITY] || 40; // ambient population by quality tier
@@ -108,6 +109,7 @@ function dropFromWorld(n) {
   if (n.real) releaseReal(n); releaseSeat(n); n.dead = true; unregister('npc:' + n.id); BYID.delete(n.id); const i = ALL.indexOf(n); if (i >= 0) ALL.splice(i, 1);
   const a = AMB.indexOf(n); if (a >= 0) AMB.splice(a, 1);
   if (n.spot) { const s = n.spot.npcs.indexOf(n); if (s >= 0) n.spot.npcs.splice(s, 1); }
+  const f = FB.indexOf(n); if (f >= 0) FB.splice(f, 1); if (fbFetch === n) fbFetch = null; if (fbChase[0] === n) fbChase[0] = null; if (fbChase[1] === n) fbChase[1] = null;
 }
 let nameUse = new Set();
 function pickName(female) { for (let t = 0; t < 8; t++) { const nm = pickOf(female ? NAMES_F : NAMES_M); if (!nameUse.has(nm)) return nm; } return pickOf(female ? NAMES_F : NAMES_M); }
@@ -166,7 +168,11 @@ function buildSpots() {
   const pair = (x, y, roles) => { const s = snap(x, y, [0, 0]); spot(s[0], s[1], 6.5, 18, sp => { const a = rnd(0, 3.14); return [0, 1].map(k => ({ role: roles[k], x: sp.x + Math.cos(a) * 0.55 * (k ? -1 : 1), y: sp.y + Math.sin(a) * 0.55 * (k ? -1 : 1), heading: a + (k ? 0 : Math.PI), behavior: 'chat' })); }); };
   pair(-110, -88, ['mekhela', 'sari']); pair(-456, -66, ['commuter', 'elder']); pair(28, -49, ['shopper', 'office']); pair(-60, -60, ['elder', 'elder']); pair(FIELD_C[0] + 24, GEO.field[1] - 5, ['commuter', 'phone']);
   // kids at play on the field and on the park forecourt
-  spot(FIELD_C[0], FIELD_C[1], 6.5, 18, sp => [0, 1, 2].map(k => ({ role: 'kid', x: sp.x + rnd(-8, 8), y: sp.y + rnd(-8, 8), heading: rnd(0, 6.28), behavior: 'play', anchor: { x: sp.x, y: sp.y, r: 14 } })));
+  // a 3-a-side match on the field: a keeper, a defender and an attacker per team (see football() below)
+  spot(FIELD.cx, FIELD.cy, 6.5, 18, () => [0, 1, 2, 3, 4, 5].map(k => {
+    const team = k < 3 ? 0 : 1, j = k % 3, g = FIELD.goals[team], [x, y] = fieldXY(j === 0 ? g.t + g.inward * 1.2 : (team ? 1 : -1) * (j === 1 ? 9 : 3),(j === 1 ? -5 : j === 2 ? 5 : 0) * (team ? -1 : 1));
+    return { role: 'kid', x, y, heading: team ? Math.atan2(-FIELD.uy, -FIELD.ux) : Math.atan2(FIELD.uy, FIELD.ux), behavior: 'football', team, fpos: SLOTS3[j], side: j === 1 ? -1 : 1 };
+  }));
   spot(-105, -100, 7, 18, sp => [0, 1].map(k => ({ role: 'kid', x: sp.x + rnd(-4, 4), y: sp.y + rnd(-4, 4), heading: rnd(0, 6.28), behavior: 'play', anchor: { x: sp.x, y: sp.y, r: 9 } })));
 }
 function activateSpot(sp) {
@@ -174,9 +180,11 @@ function activateSpot(sp) {
   for (const c of sp.make(sp)) {
     if (c.behavior !== 'sit' && !walkable(c.x, c.y)) continue; // never stand a person inside a stall or wall
     const app = randomAppearance(Math.random, { role: c.role, kid: c.role === 'kid' ? true : undefined }); if (c.phone) app.phone = true;
+    if (c.team !== undefined) { app.top = TEAM_TOP[c.team]; app.topStyle = 'tshirt'; app.bottomStyle = 'pants'; app.bag = app.umbrella = app.wrap = null; } // bibs: one team red, the other blue
     const n = makeNPC('spot' + (ambSeq++), pickName(!!app.female), c.role, c.x, c.y, c.heading, app, { talk: true, behavior: c.behavior }, 'spot');
     n.name = n.name || 'Local'; setLabel(n); n.spot = sp; n.behavior = c.behavior; n.anchor = c.anchor || null; n.idleState = c.floor ? 'floor' : c.behavior === 'sit' ? 'sit' : 'idle';
     n.vWalk = rnd(1.0, 1.3); n.vRun = rnd(2.6, 3.4); sp.npcs.push(n); addToWorld(n);
+    if (c.team !== undefined) { n.team = c.team; n.fpos = c.fpos; n.side = c.side; n.kickT = 0; n.cel = 0; FB.push(n); }
   }
   for (const n of sp.npcs) if (n.behavior === 'chat') { const o = sp.npcs.find(m => m !== n && m.behavior === 'chat'); if (o) { n.partner = o; n.t1 = rnd(0, 3); n.t2 = n === sp.npcs[0] ? 1 : 0; } }
 }
@@ -306,10 +314,122 @@ function behave(n, dt) {
       if (n.t1 <= 0) { n.t1 = rnd(2.5, 6); n.idleState = n.idleState === 'talk' ? 'idle' : 'talk'; if (o && !o.dead) o.idleState = n.idleState === 'talk' ? 'idle' : 'talk'; if (n.idleState === 'talk' && P && Math.hypot(P.x - n.x, P.y - n.y) < 16 && chance(0.18)) say(n, pickOf(BANTER), 2200); }
       break;
     }
+    case 'football': football(n, dt); break;
     case 'sit': break;
     default: break; // idle
   }
 }
+// ---------- football: the kids' 3-a-side match ----------
+// A team brain (footballBrain, once a frame) picks who goes for the ball: per team the nearest outfield kid, the keeper only when the
+// ball is in his box, and whoever has it keeps it unless a teammate is clearly closer, so they don't swap every frame. Everyone else
+// holds a spot relative to the ball (defender behind it, attacker ahead of it, keeper on his line tracking it sideways). The chaser
+// gets round behind the ball, then shoots when in range, passes to an open teammate further up, or dribbles with short touches.
+// Shots and passes play the kick animation and the ball leaves when the foot arrives; dribble touches are taken in stride.
+const SLOTS3 = ['keep', 'def', 'att'], TEAM_TOP = ['#c8322d', '#2f6fc0'], FB = [], fbChase = [null, null];
+let fbFetch = null, fbShout = 0;
+const SHOUT = ['Pass! Pass!', 'Idhar! Over here!', 'Shoot!', 'Arey, mark him!'], CHEER = ['GOAL!', 'Goooal!', 'Hoi! Goal!'], ASK = ['Ball dia! Give us the ball!', 'Dada, the ball please!', 'Throw it here!'];
+const fT = (x, y) => (x - FIELD.cx) * FIELD.ux + (y - FIELD.cy) * FIELD.uy, fL = (x, y) => -(x - FIELD.cx) * FIELD.uy + (y - FIELD.cy) * FIELD.ux; // along the pitch, across it
+const _fp = [0, 0], clampN = (v, a, b) => Math.max(a, Math.min(b, v));
+function fieldXY(t, l, out = [0, 0]) { out[0] = FIELD.cx + FIELD.ux * t - FIELD.uy * l; out[1] = FIELD.cy + FIELD.uy * t + FIELD.ux * l; return out; }
+function inBox(n, b) { const g = FIELD.goals[n.team]; return (fT(b.x, b.y) - g.t) * g.inward < 9 && Math.abs(fL(b.x, b.y)) < 8; }
+function footballBrain(dt) {
+  const b = ballRef(); if (!b || !FB.length) return;
+  fbShout -= dt;
+  const inPlay = !b.carried && b.resetT <= 0 && ballInField();
+  for (let t = 0; t < 2; t++) {
+    let best = null, bd = 1e9; const cur = fbChase[t];
+    for (const n of FB) {
+      if (n.team !== t || n.talking || (n.fpos === 'keep' && !inBox(n, b))) continue;
+      const d = Math.hypot(b.x - n.x, b.y - n.y) - (n === cur ? 2 : 0); if (d < bd) { bd = d; best = n; }
+    }
+    fbChase[t] = inPlay ? best : null;
+  }
+  // over the touchline with nobody holding it: the nearest kid fetches it and throws it back in
+  if (!b.carried && b.resetT <= 0 && !ballInField() && Math.hypot(b.x - FIELD.cx, b.y - FIELD.cy) < 80) {
+    if (!fbFetch) { let bd = 1e9; for (const n of FB) { if (n.talking) continue; const d = Math.hypot(b.x - n.x, b.y - n.y); if (d < bd) { bd = d; fbFetch = n; } } }
+  } else if (fbFetch && !(fbFetch.kickT > 0)) fbFetch = null;
+  // a kid's body shoves the ball out of the way, so nobody runs through it (only near the player, where it shows)
+  if (P && Math.hypot(b.x - P.x, b.y - P.y) < 60) for (const n of FB) if (!(n.kickT > 0)) pushBall(n.x, n.y, 0.22, n.speed);
+}
+function startKick(n, b, ang, v, lift, anim) { // anim: 'kick' (shot or pass) or 'pickup' (throw-in)
+  n.kickT = anim === 'pickup' ? 0.95 : 0.5; n.kickIn = anim === 'pickup' ? 0.85 : 0.17; n.kA = ang; n.kV = v; n.kL = lift; n.idleState = anim; n.faceT = aim(n, b.x, b.y);
+}
+function football(n, dt) {
+  const b = ballRef(); if (!b) return;
+  n.lookOn = true; n.lookX = b.x; n.lookY = b.y; n.lookZ = b.z;
+  if (n.kickT > 0) { // mid-kick or mid-pickup: stand still and let the animation play; the ball leaves when the foot (or the throw) arrives
+    n.kickT -= dt;
+    if (n.kickIn > 0 && (n.kickIn -= dt) <= 0 && Math.hypot(b.x - n.x, b.y - n.y) < 1.1) npcKick(n.kA, n.kV, n.kL);
+    if (n.kickT <= 0) { n.idleState = 'idle'; n.faceT = null; if (fbFetch === n) fbFetch = null; }
+    return;
+  }
+  if (n.cel > 0) { n.cel -= dt; if (n.cel <= 0) { n.idleState = 'idle'; n.faceT = null; } return; }
+  if (b.carried && P) { // the player walked off with it: stand, face them and ask for it back
+    n.faceT = aim(n, P.x, P.y); lookAtPlayer(n);
+    const d = Math.hypot(P.x - n.x, P.y - n.y);
+    if (d > 7 && d < 35) want(P.x + (n.x - P.x) / d * 5, P.y + (n.y - P.y) / d * 5, n.vWalk * 1.3, true);
+    n.t1 -= dt; if (n.t1 <= 0) { n.t1 = rnd(1.5, 3.5); n.idleState = chance(0.5) ? 'wave' : 'idle'; if (fbShout <= 0 && d < 25) { say(n, pickOf(ASK), 2400); fbShout = rnd(6, 10); } }
+    return;
+  }
+  n.faceT = null; if (n.idleState === 'wave') n.idleState = 'idle';
+  if (fbFetch === n) { // run to the ball, pick it up, throw it toward the middle
+    const d = Math.hypot(b.x - n.x, b.y - n.y);
+    if (d > 0.55) { want(b.x, b.y, n.vRun, true); return; }
+    const [tx, ty] = fieldXY(clampN(fT(b.x, b.y), FIELD.lo + 10, FIELD.hi - 10) * 0.6, 0, _fp), a = Math.atan2(ty - b.y, tx - b.x);
+    startKick(n, b, a, clampN(Math.hypot(tx - b.x, ty - b.y) * 0.55, 5, 9), 3.2, 'pickup'); return;
+  }
+  const opp = FIELD.goals[1 - n.team], own = FIELD.goals[n.team], dir = n.team ? -1 : 1;
+  if (fbChase[n.team] === n) { chaseBall(n, b, opp); return; }
+  // off the ball: hold a spot relative to it, re-picked now and then so the shape breathes instead of sliding with every roll
+  if ((n.t1 -= dt) <= 0 || n.sx === undefined) {
+    n.t1 = rnd(0.5, 1.2); const bt = fT(b.x, b.y), bl = fL(b.x, b.y); let t, l;
+    if (n.fpos === 'keep') { t = own.t + own.inward * 1.2; l = clampN(bl * 0.3, -3, 3); }
+    else if (n.fpos === 'def') { t = dir > 0 ? clampN(bt - 8, own.t + 5, Math.max(bt, own.t + 5)) : clampN(bt + 8, Math.min(bt, own.t - 5), own.t - 5); l = clampN(bl * 0.5 + n.side * 5, FIELD.wlo + 3, FIELD.whi - 3); }
+    else { t = clampN(bt + dir * rnd(6, 10), FIELD.lo + 4, FIELD.hi - 4); l = clampN(bl * 0.3 + n.side * rnd(5, 9), FIELD.wlo + 3, FIELD.whi - 3); }
+    fieldXY(t, l, _fp); n.sx = _fp[0]; n.sy = _fp[1];
+  }
+  const d = Math.hypot(n.sx - n.x, n.sy - n.y);
+  if (d > 0.8) want(n.sx, n.sy, d > 6 ? n.vRun : Math.max(1.3, n.vRun * 0.5), true); else n.faceT = aim(n, b.x, b.y);
+  if (n.fpos === 'att' && fbShout <= 0 && P && Math.hypot(P.x - n.x, P.y - n.y) < 20 && chance(0.004)) { say(n, pickOf(SHOUT), 1800); fbShout = rnd(5, 9); }
+}
+function chaseBall(n, b, opp) {
+  const gx = opp.x - b.x, gy = opp.y - b.y, gd = Math.hypot(gx, gy) || 1, ux = gx / gd, uy = gy / gd; // ball -> the goal they attack
+  const lead = Math.min(0.5, Math.hypot(b.x - n.x, b.y - n.y) / 7), bx = b.x + b.vx * lead, by = b.y + b.vy * lead; // run to where it is going
+  const rx = n.x - bx, ry = n.y - by, d = Math.hypot(rx, ry) || 1e-3, behind = -(rx * ux + ry * uy) / d; // 1: straight behind it, -1: between it and the goal
+  if (d < 0.7 && behind > 0.2 && b.z - n.z < 0.6) {
+    if (n.fpos === 'keep') { startKick(n, b, Math.atan2(uy, ux) + rnd(-0.4, 0.4), rnd(11, 14), rnd(4, 6), 'kick'); return; } // clear it upfield
+    if (gd < 17) { // shoot: somewhere between the posts
+      const [tx, ty] = fieldXY(opp.t, rnd(-3.2, 3.2), _fp); startKick(n, b, Math.atan2(ty - b.y, tx - b.x), rnd(9, 12.5), rnd(0.4, 3), 'kick');
+      if (fbShout <= 0 && chance(0.3)) { say(n, 'Shoot!', 1200); fbShout = 4; } return;
+    }
+    let mate = null, ma = 2;
+    for (const m of FB) {
+      if (m.team !== n.team || m === n || m.fpos === 'keep') continue;
+      const ahead = (m.x - b.x) * ux + (m.y - b.y) * uy, md = Math.hypot(m.x - b.x, m.y - b.y); if (ahead < ma || md > 24 || md < 4) continue;
+      let open = true; for (const o of FB) if (o.team !== n.team && Math.hypot(o.x - m.x, o.y - m.y) < 2.5) { open = false; break; }
+      if (open) { ma = ahead; mate = m; }
+    }
+    let press = false; for (const o of FB) if (o.team !== n.team && Math.hypot(o.x - n.x, o.y - n.y) < 2.2) { press = true; break; }
+    if (mate && chance(press ? 0.8 : 0.35)) { // pass into the teammate's run
+      const px = mate.x + mate.vx * 0.6, py = mate.y + mate.vy * 0.6, pd = Math.hypot(px - b.x, py - b.y);
+      startKick(n, b, Math.atan2(py - b.y, px - b.x), clampN(pd * 0.7 + 3, 5, 11), 0.3, 'kick'); return;
+    }
+    npcKick(Math.atan2(uy, ux) + rnd(-0.35, 0.35) + (press ? (chance(0.5) ? 0.6 : -0.6) : 0), Math.max(n.speed, 1.5) + rnd(1.0, 2.0), 0); // dribble: a touch ahead, in stride; under pressure, cut away
+  }
+  // come at the ball from behind; on the wrong side of it, swing round instead of running through it
+  let tx, ty;
+  if (behind > -0.2 || d > 4) { tx = bx - ux * 0.45; ty = by - uy * 0.45; }
+  else { const s = (rx * -uy + ry * ux) > 0 ? 1 : -1; tx = bx - ux * 0.9 - uy * s; ty = by - uy * 0.9 + ux * s; }
+  want(tx, ty, n.vRun, false);
+}
+on('ball:goal', ({ goal, byPlayer }) => {
+  const scorer = goal === 1 ? 0 : 1; let said = false; // team 0 attacks goals[1]
+  for (const n of FB) {
+    n.cel = rnd(2, 3); n.kickT = 0; n.idleState = n.team === scorer && !byPlayer ? 'wave' : 'idle'; n.faceT = null; n.sx = undefined;
+    if (!said && P && Math.hypot(P.x - n.x, P.y - n.y) < 35 && (byPlayer || n.team === scorer)) { say(n, byPlayer ? 'Bhal shot! Nice one!' : pickOf(CHEER), 2200); said = true; }
+  }
+});
+
 // wanting to move but getting nowhere: sidestep at an angle (1 s), then ask for a new route (3 s), then, out of the
 // player's sight, hop to the nearest walk-graph node (7 s). Alternates the sidestep side so two people don't mirror each other.
 const _u = [0, 0];
@@ -385,6 +505,7 @@ function locomote(n, dt, cheap) {
 }
 function stepNPC(n, dt, cheap) {
   n.z = groundAt(n.x, n.y);
+  n.lookOn = false;
   if (n.talking) { if (P) turnTo(n, Math.atan2(P.y - n.y, P.x - n.x), 6, dt); n.state = 'talk'; n.speed = 0; n.vx = n.vy = 0; return; }
   if (n.flinchT > 0) { n.flinchT -= dt; n.x += n.slideX * dt; n.y += n.slideY * dt; n.state = 'flinch'; n.speed = 0; return; }
   if (n.bumpCd > 0) n.bumpCd -= dt; if (n.greetCd > 0) n.greetCd -= dt; if (n.sayCd > 0) n.sayCd -= dt;
@@ -396,7 +517,10 @@ function stepNPC(n, dt, cheap) {
     n.state = n.idleState; n.speed = 0; n.vx = n.vy = 0; return;
   }
   locomote(n, dt, cheap);
+  if (n.kickT > 0 || n.cel > 0) n.state = n.idleState; // kick, throw-in, celebration: the pose holds even while still sliding to a stop
 }
+// footballers note what they watch (lookOn / lookX / lookY / lookZ); nothing turns a head yet
+function lookAtPlayer(n) { n.lookOn = true; n.lookX = P.x; n.lookY = P.y; n.lookZ = (P.z || 0) + 1.55; }
 
 // ---------- speech and talking ----------
 function say(n, text, ms = 3200) { bubble('npc:' + n.id, n._hfn, text, ms); }
@@ -468,6 +592,7 @@ function updateNPCs(dt, player) {
   let rc = 0; for (let i = 0; i < AMB.length && rc < 2; i++) { const n = AMB[i], dx = n.x - P.x, dy = n.y - P.y; if (dx * dx + dy * dy > RECYCLE_R * RECYCLE_R) { recycle(n); rc++; } }
   if ((spotT -= dt) <= 0) { spotT = 0.5; manageSpots(); }
   processPaths();
+  footballBrain(dt);
   for (let i = 0; i < ALL.length; i++) {
     const n = ALL[i]; n.animDt += dt; const dx = n.x - P.x, dy = n.y - P.y, far = dx * dx + dy * dy > NEAR * NEAR;
     if (far) { n.acc += dt; if (n.acc < FAR_DT) continue; stepNPC(n, n.acc, true); n.acc = 0; } else { stepNPC(n, n.acc + dt, false); n.acc = 0; }

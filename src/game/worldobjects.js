@@ -18,7 +18,6 @@ import { bigMessage, fade, flash, showDialogue, toast } from './hud.js';
 import { register, unregister } from './interact.js';
 import { openShop } from './items.js';
 import { addMarker, removeMarker } from './map.js';
-import { allNPCs } from './npc/agents.js';
 import { addBuff, getCameraMode, getPlayer, mountVehicle, playEmote, setCameraMode, setInputLocked, setSeated, teleport } from './player.js';
 import { PLACES } from './content/places.js';
 
@@ -406,10 +405,10 @@ const FIELD = (() => { // goals sit on the polygon's long (PCA) axis, 5 m in fro
   let sxx = 0, syy = 0, sxy = 0; for (const p of F) { const dx = p[0] - cx, dy = p[1] - cy; sxx += dx * dx; syy += dy * dy; sxy += dx * dy; }
   const ang = 0.5 * Math.atan2(2 * sxy, sxx - syy), ux = Math.cos(ang), uy = Math.sin(ang);
   let lo = 1e9, hi = -1e9; for (const p of F) { const t = (p[0] - cx) * ux + (p[1] - cy) * uy; lo = Math.min(lo, t); hi = Math.max(hi, t); }
-  return { cx, cy, ux, uy, goals: [{ t: lo + 5, inward: 1 }, { t: hi - 5, inward: -1 }].map(g => ({ ...g, x: cx + ux * g.t, y: cy + uy * g.t })) };
+  let wlo = 1e9, whi = -1e9; for (const p of F) { const l = -(p[0] - cx) * uy + (p[1] - cy) * ux; wlo = Math.min(wlo, l); whi = Math.max(whi, l); } // lateral extent, for the kids' formation
+  return { cx, cy, ux, uy, lo, hi, wlo, whi, goals: [{ t: lo + 5, inward: 1 }, { t: hi - 5, inward: -1 }].map(g => ({ ...g, x: cx + ux * g.t, y: cy + uy * g.t })) };
 })();
 const ball = { x: FIELD.cx, y: FIELD.cy, z: 0, vx: 0, vy: 0, vz: 0, r: 0.11, mesh: null, lastPlayer: -99, lastKid: -99, resetT: 0, pos: [0, 0, 0], carried: false, handle: null };
-const kids = []; let kidT = 0;
 function ballTex() {
   return canvasTex(256, 128, (g, w, h) => {
     g.fillStyle = '#f4f4f0'; g.fillRect(0, 0, w, h); g.fillStyle = '#1b1b1d';
@@ -447,8 +446,8 @@ function launchBall() {
   const h = ball.kickH;
   ball.vx = Math.cos(h) * 9; ball.vy = Math.sin(h) * 9; ball.vz = 2.8; ball.lastPlayer = T; sfx('kick', { x: ball.x, y: ball.y });
 }
-function scoreGoal(byPlayer) {
-  ball.resetT = 2;
+function scoreGoal(byPlayer, gi) {
+  ball.resetT = 2; emit('ball:goal', { goal: gi, byPlayer });
   if (byPlayer) { state.stats.goals += 1; emit('goal:scored', { goals: state.stats.goals }); sfx('goal'); bigMessage('GOAL!'); }
   else { sfx('goal', { vol: 0.4 }); toast('The kids score a goal!', { kind: 'info' }); }
 }
@@ -470,15 +469,7 @@ function stepBall(dt, p) {
       if (sp > 0.4) { const want = sp * 1.35 + 0.6, along = ball.vx * nx + ball.vy * ny; if (along < want) { ball.vx += nx * (want - along); ball.vy += ny * (want - along); } ball.lastPlayer = T; }
     }
   }
-  // kids near the ball kick it toward a goal (refresh the nearby-kid list once a second)
-  kidT -= dt; if (kidT <= 0) { kidT = 1; kids.length = 0; for (const n of allNPCs()) if (n.role === 'kid' && Math.hypot(n.x - ball.x, n.y - ball.y) < 60) kids.push(n); }
-  if (kids.length && T - ball.lastKid > 0.7 && ball.z < 1 && ball.resetT <= 0 && Math.hypot(ball.x - FIELD.cx, ball.y - FIELD.cy) < 45) {
-    for (const n of kids) {
-      if (Math.hypot(n.x - ball.x, n.y - ball.y) > 0.6) continue;
-      const g = FIELD.goals[Math.random() < 0.5 ? 0 : 1], tx = g.x + rnd(-2, 2) * -FIELD.uy, ty = g.y + rnd(-2, 2) * FIELD.ux, a = Math.atan2(ty - ball.y, tx - ball.x), v = rnd(6, 9.5);
-      ball.vx = Math.cos(a) * v; ball.vy = Math.sin(a) * v; ball.vz = rnd(0.8, 2.6); ball.lastKid = T; sfx('kick', { x: ball.x, y: ball.y }); break;
-    }
-  }
+  // the kids' match itself (who chases, passes, shoots) lives in npc/agents.js and acts through npcKick / pushBall below
   const sp0 = Math.hypot(ball.vx, ball.vy), gz0 = groundAt(ball.x, ball.y) + ball.r;
   if (sp0 < 0.02 && ball.vz === 0 && ball.z <= gz0 + 0.005) { ball.vx = ball.vy = 0; ball.z = gz0; syncBall(); return; }
   const n = Math.min(4, Math.max(1, Math.ceil(sp0 * dt / 0.25))), h = dt / n;
@@ -495,11 +486,11 @@ function stepBall(dt, p) {
       const s = Math.hypot(ball.vx, ball.vy);
       if (s > 0) { const ns = Math.max(0, s - (0.5 + 0.2 * s) * h) / s; ball.vx *= ns; ball.vy *= ns; }
     }
-    if (ball.resetT <= 0) for (const g of FIELD.goals) { // crossing the goal line between the posts, under the bar
+    if (ball.resetT <= 0) for (let gi = 0; gi < 2; gi++) { const g = FIELD.goals[gi]; // crossing the goal line between the posts, under the bar
       const t0 = (ox - FIELD.cx) * FIELD.ux + (oy - FIELD.cy) * FIELD.uy - g.t, t1 = (ball.x - FIELD.cx) * FIELD.ux + (ball.y - FIELD.cy) * FIELD.uy - g.t;
       if (t0 * g.inward > 0 && t1 * g.inward <= 0) {
         const lat = -(ball.x - FIELD.cx) * FIELD.uy + (ball.y - FIELD.cy) * FIELD.ux, glat = -(g.x - FIELD.cx) * FIELD.uy + (g.y - FIELD.cy) * FIELD.ux;
-        if (Math.abs(lat - glat) < 3.66 && ball.z - groundAt(ball.x, ball.y) < 2.44 + ball.r) { scoreGoal(T - ball.lastPlayer < 8); break; }
+        if (Math.abs(lat - glat) < 3.66 && ball.z - groundAt(ball.x, ball.y) < 2.44 + ball.r) { scoreGoal(T - ball.lastPlayer < 8, gi); break; }
       }
     }
   }
@@ -510,6 +501,20 @@ function stepBall(dt, p) {
 }
 function setBallPosition(x, y) { if (!ball.mesh) return; if (!walkable(x, y)) [x, y] = findOpen(x, y); ball.resetT = 0; ball.carried = false; if (ball.handle) ball.handle.set({ priority: 1 }); placeBall(x, y); }
 function getBall() { return { x: ball.x, y: ball.y, carried: ball.carried, inField: !ball.carried && ballInField() }; }
+const ballRef = () => (ball.mesh ? ball : null); // the live ball for per-frame readers (no allocation); treat it as read-only
+// an NPC strikes the ball: map angle, ground speed, upward speed. Refused while it is held, in the goal reset or just kicked
+function npcKick(ang, v, lift) {
+  if (!ball.mesh || ball.carried || ball.resetT > 0 || T - ball.lastKid < 0.3) return false;
+  ball.vx = Math.cos(ang) * v; ball.vy = Math.sin(ang) * v; ball.vz = lift; ball.lastKid = T;
+  if (v > 2.5) sfx('kick', { x: ball.x, y: ball.y, vol: Math.min(1, v / 9) }); return true;
+}
+// a body at (x, y) with radius r shoves a rolling ball out of itself (feet, shins), so nobody runs through it
+function pushBall(x, y, r, sp) {
+  if (!ball.mesh || ball.carried || ball.z - groundAt(ball.x, ball.y) > 0.6) return;
+  const dx = ball.x - x, dy = ball.y - y, d = Math.hypot(dx, dy), rr = r + ball.r; if (d >= rr || d < 1e-3) return;
+  const nx = dx / d, ny = dy / d, px = x + nx * rr, py = y + ny * rr; if (walkable(px, py)) { ball.x = px; ball.y = py; }
+  const want = (sp || 0) * 1.2 + 0.3, along = ball.vx * nx + ball.vy * ny; if (along < want) { ball.vx += nx * (want - along); ball.vy += ny * (want - along); }
+}
 
 // ---------- temple bell, binoculars, prayers ----------
 let bell = null;
@@ -676,4 +681,4 @@ function updateWorldObjects(dt, player) {
   run('pumps', updatePumps, dt); run('binoculars', updateBinoculars, dt, player); run('delivery', updateDelivery, dt);
 }
 
-export { initWorldObjects, updateWorldObjects, takePhoto, setWorldMarker, clearWorldMarker, startDelivery, getDelivery, cancelDelivery, setBallPosition, getBall, setScooterUnlocked };
+export { initWorldObjects, updateWorldObjects, takePhoto, setWorldMarker, clearWorldMarker, startDelivery, getDelivery, cancelDelivery, setBallPosition, getBall, setScooterUnlocked, FIELD, ballRef, ballInField, npcKick, pushBall };

@@ -104,6 +104,7 @@ logged.
 | `dog:fed` / `animal:pet` | `{ id, kind }` | animals |
 | `bell:rung` | `{}` | worldobjects |
 | `goal:scored` | `{ goals }` | worldobjects (football) |
+| `ball:goal` | `{ goal, byPlayer }` (`goal` = index into `FIELD.goals`; any goal, the kids' too) | worldobjects (football) |
 | `photo:taken` | `{ placeId, name }` (`placeId` null if no landmark in shot) | worldobjects |
 | `binocular:spotted` | `{ placeId, name }` | worldobjects |
 | `item:used` | `{ id }` | items |
@@ -164,9 +165,12 @@ on the instanced crowd.
 `npcMoveTo(id, x, y, { run, onArrive })`, `npcFace(id, x, y)`, `removeNPC(id)`.
 NPC: `{ id, name, role, title, x, y, z, heading, speed, state, behavior, def, talking }`.
 def: `{ id, name, role, title?, x, y, heading?, appearance? (partial), seed?, behavior?: idle|wander|patrol|sit|vendor|
-play|follow|pace, anchor?: {x, y, r}, path?: [[x, y]], talk? (default true), onTalk?: async (npc) => void,
+play|follow|pace|football, anchor?: {x, y, r}, path?: [[x, y]], talk? (default true), onTalk?: async (npc) => void,
 lines?: [string] }`. Every NPC with `talk !== false` gets an interactable (`npc:<id>`); talking stops it, turns it to
 the player, emits `npc:talk`, then runs `def.onTalk(npc)` or a random line from `def.lines` / the ambient pool.
+The field's kids are a 3-a-side match (`behavior: 'football'`, `team` 0/1, `fpos` keep/def/att; team 0 attacks
+`FIELD.goals[1]`); they act on the ball only through `npcKick` and `pushBall`. Do not use `n.slot` for anything: it is the
+rigged-model slot from `realpool.js`.
 
 ### animals.js (animals and traffic)
 `initAnimals()`, `updateAnimals(dt, player)`, `allAnimals() -> [{ id, kind, name?, x, y, heading, state }]`,
@@ -192,7 +196,10 @@ shows the prompt through `hud.setPrompt`), `tryInteract() -> bool`, `getFocused(
 `initWorldObjects()`, `updateWorldObjects(dt, player)`, `takePhoto()`, `setWorldMarker(id, { x, y, z?, color? })`,
 `clearWorldMarker(id)`, `startDelivery() -> job | null` (job: `{ id, x, y, label, reward, timeLeft }`),
 `getDelivery() -> job | null`, `cancelDelivery()`, `setBallPosition(x, y)`, `getBall() -> { x, y, inField }`,
-`setScooterUnlocked(on)` (rideable scooters ask for permission until the quest unlocks them).
+`setScooterUnlocked(on)` (rideable scooters ask for permission until the quest unlocks them), `FIELD` (pitch frame: centre
+`cx, cy`, long axis `ux, uy`, extents `lo, hi` along it and `wlo, whi` across it, `goals`), `ballRef()` (the live ball, read-only,
+null before init), `ballInField()`, `npcKick(angle, speed, lift) -> bool` (refused while held, after a goal or within 0.3 s of the
+last kick), `pushBall(x, y, r, speed)` (a body shoving the ball out of itself).
 
 Item ids (`items.js`): `lal_sah doodh_sah samosa pitha jalebi biscuits banana marigold water newspaper cash_bag parcel`.
 Shop ids: `tea_stall` (Bina, park forecourt x -121), `pan_tea` (Khagen, field kiosk x 24), `store` (Mamoni, x 31),
