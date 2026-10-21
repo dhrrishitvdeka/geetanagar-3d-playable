@@ -93,7 +93,7 @@ function buildFlowersAndRocks() {
     const mp = modelParts(model.scene);
     for (const p of mp.parts) {
       const pts = []; for (const [bx, by, br] of beds) for (let k = 0; k < 40; k++) { const a = hash2(k, bx) * 6.28, rr = Math.sqrt(hash2(bx, k)) * (br - 0.3); pts.push([bx + Math.cos(a) * rr, by + Math.sin(a) * rr]); }
-      const im = new THREE.InstancedMesh(p.geo, p.mat, pts.length);
+      const im = new THREE.InstancedMesh(p.geo, p.mat, pts.length); im.name = 'park flowers';
       pts.forEach(([x, y], i) => { const s = 0.45 / mp.h * (0.8 + hash2(x, y) * 0.5); dm.position.set(x, hAt(x, y) + 0.08, -y); dm.rotation.set(0, hash2(y, x) * 6.28, 0); dm.scale.setScalar(s); dm.updateMatrix(); im.setMatrixAt(i, dm.matrix); });
       im.castShadow = quality() === 'high'; scene.add(im);
     }
@@ -102,7 +102,7 @@ function buildFlowersAndRocks() {
     const mp = modelParts(ASSET.rock.scene), r = rng(9), pts = [];
     for (let i = 0; i < 4000 && pts.length < 140; i++) { const x = HG.x0 + r() * TW, y = HG.y0 + r() * TD; if (hAt(x, y) < 6 || clsAt(x, y) !== 0 && clsAt(x, y) !== 9) continue; pts.push([x, y, 0.6 + r() * 1.4]); }
     for (const p of mp.parts) {
-      const im = new THREE.InstancedMesh(p.geo, p.mat, pts.length);
+      const im = new THREE.InstancedMesh(p.geo, p.mat, pts.length); im.name = 'rocks';
       pts.forEach(([x, y, s], i) => { dm.position.set(x, hAt(x, y) - 0.15 * s, -y); dm.rotation.set(0, hash2(x, y) * 6.28, 0); dm.scale.setScalar(s / mp.h); dm.updateMatrix(); im.setMatrixAt(i, dm.matrix); });
       im.castShadow = true; im.receiveShadow = true; scene.add(im);
     }

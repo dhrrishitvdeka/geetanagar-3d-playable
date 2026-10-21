@@ -136,7 +136,7 @@ function buildTreeMeshes() {
           ? patchVeg(new THREE.MeshStandardMaterial({ map: leafTex[v], alphaTest: 0.5, alphaToCoverage: QUALITY !== 'low', side: THREE.DoubleSide, roughness: 0.78 }), { ...wind, flutter: 0.05, foliage: { center, radius, mix: 0.65, ao: 0.45 }, upNormals: true })
           : patchVeg(new THREE.MeshStandardMaterial({ map: ASSET.bark, normalMap: ASSET.barkN, color: bark, roughness: 0.95 }), wind);
         // sliced round the camera so the slices out of view are culled (leaf slices carry the per-tree tint)
-        const im = new SectorSet(p.geo, mat, Math.max(...Object.values(QP).map(q => q.cap)), { colors: leaf }); im.castShadow = true; im.receiveShadow = true;
+        const im = new SectorSet(p.geo, mat, Math.max(...Object.values(QP).map(q => q.cap)), { colors: leaf, name: `tree:${v}:${leaf ? 'leaf' : 'bark'}` }); im.castShadow = true; im.receiveShadow = true;
         im.customDepthMaterial = leaf ? vegDepth(leafTex[v], { ...wind, flutter: 0.05 }) : vegDepth(null, wind, 0);
         im.leaf = leaf;
         return im;
@@ -153,7 +153,7 @@ function buildTreeMeshes() {
         dm.position.set(t.x, t.h - 0.25, -t.y); dm.rotation.set(0, t.yaw, 0); dm.scale.set(sc * t.sx, sc * t.sy, sc * t.sx); dm.updateMatrix();
         im.setMatrixAt(i, dm.matrix); im.setColorAt(i, t.tint);
       });
-      im.count = list.length; im.userData.nInner = nInner; im.userData.nAll = list.length; scene.add(im); imps[v] = im;
+      im.name = `impostor:${v}`; im.count = list.length; im.userData.nInner = nInner; im.userData.nAll = list.length; scene.add(im); imps[v] = im;
     }
   }
   // yard plants: per species and variant, a near (detailed) and far (simple) instanced pair
@@ -164,7 +164,7 @@ function buildTreeMeshes() {
     const set = plantSets[sp + v] = {};
     for (const [lod, detail] of [['near', true], ['far', false]]) {
       const g = BUILDERS[sp](seed, detail);
-      const tr = new SectorSet(g.trunk, M[sp].trunk, n, PLANT_SLICES), lf = new SectorSet(g.leaf, M[sp].leaf, n, PLANT_SLICES);
+      const tr = new SectorSet(g.trunk, M[sp].trunk, n, { ...PLANT_SLICES, name: `plant:${sp}${v}:${lod}:trunk` }), lf = new SectorSet(g.leaf, M[sp].leaf, n, { ...PLANT_SLICES, name: `plant:${sp}${v}:${lod}:leaf` });
       lf.customDepthMaterial = M[sp].depth;
       for (const m of [tr, lf]) { m.castShadow = lod === 'near' || sp === 'coconut'; m.receiveShadow = true; }
       set[lod] = [tr, lf];

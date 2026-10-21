@@ -293,11 +293,11 @@ function buildAll() {
   const tm = new THREE.InstancedMesh(tg, new THREE.MeshStandardMaterial({ color: '#202326', roughness: 0.55 }), tanks.reduce((s, t) => s + t.n, 0));
   const dm = new THREE.Object3D(); let ti = 0;
   for (const t of tanks) for (let q = 0; q < t.n; q++) { dm.position.set(t.x + q * 1.8, t.z, -t.y); dm.updateMatrix(); tm.setMatrixAt(ti++, dm.matrix); }
-  tm.castShadow = true; tm.receiveShadow = true; scene.add(tm);
+  tm.name = 'roof tanks'; tm.castShadow = true; tm.receiveShadow = true; scene.add(tm);
   const stand = new THREE.BoxGeometry(1.7, 0.9, 1.7); stand.translate(0, 0.45, 0);
   const sm = new THREE.InstancedMesh(stand, new THREE.MeshStandardMaterial({ color: '#8f8b83', roughness: 0.9 }), tanks.length); ti = 0;
   for (const t of tanks) { dm.position.set(t.x + (t.n - 1) * 0.9, t.z, -t.y); dm.scale.set(t.n > 1 ? 2.1 : 1, 1, 1); dm.updateMatrix(); sm.setMatrixAt(ti++, dm.matrix); dm.scale.set(1, 1, 1); }
-  sm.castShadow = sm.receiveShadow = true; scene.add(sm);
+  sm.name = 'roof tank stands'; sm.castShadow = sm.receiveShadow = true; scene.add(sm);
   if (import.meta.env.DEV) console.info(`[buildings] ${BLD.length} buildings, facade textures ${FM.ms.toFixed(0)} ms, cells ${CELLB.size}, verts: walls ${wv}, trim ${tv}, rail ${rv}`);
 }
 

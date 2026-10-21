@@ -99,8 +99,8 @@ function buildOuter() {
     boxes.length = 0; boxes.push(...kb); OUTER_TREES.length = 0; OUTER_TREES.push(...kt);
   }
   const dm = new THREE.Object3D(), geoB = new THREE.BoxGeometry(1, 1, 1); geoB.translate(0, 0.5, 0);
-  const walls = new THREE.InstancedMesh(geoB, new THREE.MeshStandardMaterial({ color: '#fff', roughness: 0.9 }), boxes.length);
-  const roofs = new THREE.InstancedMesh(geoB, new THREE.MeshStandardMaterial({ color: '#fff', roughness: 0.85 }), boxes.length * 2);
+  const walls = new THREE.InstancedMesh(geoB, new THREE.MeshStandardMaterial({ color: '#fff', roughness: 0.9 }), boxes.length); walls.name = 'outer house walls';
+  const roofs = new THREE.InstancedMesh(geoB, new THREE.MeshStandardMaterial({ color: '#fff', roughness: 0.85 }), boxes.length * 2); roofs.name = 'outer house roofs';
   const WC = ['#ddd5c4', '#d2c7b2', '#c9cfcb', '#e0cdb3', '#c6bfb2', '#e2c4b0', '#d3d8d6', '#cfc39a', '#c9d2b4', '#e3d9c9'].map(x => new THREE.Color(x));
   // roofs: weathered concrete mostly, then painted tin sheets (rust red, blue, green) on the single-storey houses
   const RC = [['#8d8a83', 30], ['#7d7a73', 20], ['#a29d92', 15], ['#8a5440', 10], ['#5f7387', 8], ['#5e7458', 7], ['#9b4a3a', 6], ['#6b6b6b', 4]];
