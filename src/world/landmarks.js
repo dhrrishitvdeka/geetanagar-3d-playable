@@ -16,6 +16,15 @@ function shikhara(height, radius, faces = 12) {
   g.traverse(o => { o.castShadow = true; o.receiveShadow = true; });
   return g;
 }
+// a namghar is a long prayer hall under a hipped tin roof: just a small gold-capped finial on the ridge, no shikhara
+function finial() {
+  const g = new THREE.Group();
+  const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 0.9, 8), MAT.grey); stem.position.y = 0.45; g.add(stem);
+  const pot = new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 8), MAT.gold); pot.scale.y = 1.2; pot.position.y = 1.02; g.add(pot);
+  const tip = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.4, 8), MAT.gold); tip.position.y = 1.46; g.add(tip);
+  g.traverse(o => { o.castShadow = true; o.receiveShadow = true; });
+  return g;
+}
 // ---------- landmark styles: temples, namghar, schools, the bank ----------
 const LANDMARK_STYLE = new Map();
 for (const L of GEO.labels) {
@@ -31,8 +40,8 @@ for (const L of GEO.labels) {
 const TEMPLE_TOPS = [];
 function decorateLandmark(b, st, top) {
   if (st.kind === 'temple') { const s = shikhara(Math.min(7, 2.5 + Math.sqrt(b.a) * 0.3), Math.min(2.6, Math.sqrt(b.a) * 0.13)); s.position.set(b.c[0], top, -b.c[1]); scene.add(s); }
-  if (st.kind === 'namghar') { // Assamese prayer hall: a carved gate (batchora) on its road side
-    const s = shikhara(1.6, 0.55, 8); s.position.set(b.c[0], top + 2.4, -b.c[1]); scene.add(s);
+  if (st.kind === 'namghar') { // top = eave height; the hipped roof (buildings.js) peaks Math.min(5, sqrt(a) * 0.35) above it, over the centroid
+    const s = finial(); s.position.set(b.c[0], top + Math.min(5, Math.sqrt(b.a) * 0.35) - 0.1, -b.c[1]); scene.add(s);
   }
 }
 
