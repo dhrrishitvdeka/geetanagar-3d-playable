@@ -313,7 +313,9 @@ const M_TEE = ['#c0392b', '#1f77b4', '#2e8b57', '#f39c12', '#8e44ad', '#16a085',
 const M_KURTA = ['#f0ead8', '#e8d9b5', '#7aa7c7', '#9ab973', '#d7a86e', '#b36b5e', '#c9c0d8'];
 const M_PANTS = ['#2b2f3a', '#3a3f4b', '#5b4a3a', '#6b6f78', '#252525', '#4a5568', '#3b5b8c', '#2f4a73', '#47658f'];
 const M_SHORTS = ['#6b7a8f', '#8a7a5a', '#3b4a5a', '#2c3e50', '#556b4f'];
-const MEKHELA = [['#ece0bc', '#ece0bc', '#8e2f4a'], ['#7a1c2c', '#7a1c2c', '#d9b44a'], ['#2d6a4f', '#2d6a4f', '#efe3c2'], ['#d3a43a', '#d3a43a', '#7a1c2c'], ['#f1ead6', '#f1ead6', '#2b5d8a'], ['#c9a24a', '#ece0bc', '#4a2a6a']]; // mekhela, chador, blouse
+// mekhela, sador, blouse, motif, fabric: muga (golden beige) and pat (ivory) silk with red motifs; cotton for daily wear
+const MEKHELA = [['#cdae6c', '#d8bd7f', '#8e1f2f', '#a3172b', 'silk'], ['#efe6cf', '#f3ecd9', '#1f6a45', '#b3202e', 'silk'], ['#e9c46a', '#f1e3b8', '#2a6f6b', '#1d6e5a', 'cotton'],
+  ['#f2a2b4', '#f6d2da', '#7a1c3c', '#7a1c3c', 'cotton'], ['#7fb3d5', '#d6e7f2', '#1f3f6b', '#1f3f6b', 'cotton'], ['#c94f4f', '#e8b4a0', '#3a2a1a', '#e2b84f', 'cotton']];
 const SARI = [['#b03060', '#b03060', '#e8c46a'], ['#2e6f95', '#2e6f95', '#f0e6d0'], ['#c77d3a', '#e8c46a', '#5a2a3a'], ['#6a8d3a', '#6a8d3a', '#f4ead0'], ['#8b2a5a', '#d9a0b8', '#2f2f3a'], ['#d1495b', '#d1495b', '#f1e6d4'], ['#3d5a80', '#98c1d9', '#ffffff']];
 const KURTI = ['#6aa5c8', '#d98e73', '#9bc59d', '#c78fb5', '#e3c16f', '#d3687c'], SALWAR = ['#f0e6d6', '#3d4a6b', '#6a3d5a', '#e9e2cf', '#2f5d50'], DUPATTA = ['#f4e9d8', '#c9406a', '#5a8fb8', '#d9b44a'];
 const UNI_BOT = ['#232f55', '#5d6168', '#6d2330'], BAGS = ['#2a4d8f', '#b5392f', '#2f2f33', '#3c7a4a', '#d98a2a', '#7a4a8a', '#6b4a2c'], UMBR = ['#161616', '#161616', '#161616', '#c0392b', '#2a6fb5', '#e6b422', '#3c8a4a'];
@@ -335,7 +337,7 @@ function randomAppearance(rand = Math.random, opts = {}) {
   if (role === 'student') { a.height = rng2(rand, 0.74, 0.95); a.kid = a.height < 0.8; a.build = rng2(rand, 0.9, 1.0); }
   if (female) {
     a.hairStyle = chance(rand, 0.5) ? 'long' : chance(rand, 0.8) ? 'bun' : 'short';
-    if (style === 'mekhela') { const [m, w, b] = pick(rand, MEKHELA); a.bottom = m; a.bottomStyle = 'mekhela'; a.wrap = w; a.top = b; a.topStyle = 'blouse'; }
+    if (style === 'mekhela') { const [m, w, b, mo, fab] = pick(rand, MEKHELA); a.bottom = m; a.bottomStyle = 'mekhela'; a.wrap = w; a.top = b; a.topStyle = 'blouse'; a.motif = mo; a.fabric = fab; }
     else if (style === 'sari') { const [m, w, b] = pick(rand, SARI); a.bottom = m; a.bottomStyle = 'sari'; a.wrap = w; a.top = b; a.topStyle = 'blouse'; }
     else if (style === 'salwar') { a.top = pick(rand, KURTI); a.topStyle = 'kurta'; a.bottom = pick(rand, SALWAR); a.bottomStyle = 'pants'; if (chance(rand, 0.6)) a.wrap = pick(rand, DUPATTA); }
     else if (style === 'uniform') { a.top = '#f2f2f0'; a.topStyle = 'uniform'; a.bottom = pick(rand, UNI_BOT); a.bottomStyle = chance(rand, 0.6) ? 'skirt' : 'pants'; a.bag = pick(rand, BAGS); a.bagStyle = 'back'; a.hairStyle = chance(rand, 0.6) ? 'long' : 'short'; }

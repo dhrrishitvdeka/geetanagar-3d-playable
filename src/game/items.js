@@ -36,9 +36,9 @@ const ITEMS = {
   cake: { name: 'Cake slice', price: 25, desc: 'A soft slice of sponge cake with cream on top.', use() { eat(0.35); return 'Cream on your nose. Worth it.'; } },
   // outfits: worn, not used up. `wear` is laid over your look (player.js); New Assam Dresses sells them
   mekhela_muga: { name: 'Muga mekhela sador', price: 180, desc: 'Golden muga silk woven with red motifs at the border, with a matching sador and a maroon blouse. Made for Bihu.',
-    wear: { female: true, hairStyle: 'bun', topStyle: 'blouse', top: '#8e1f2f', bottomStyle: 'mekhela', bottom: '#d6b25e', wrap: '#e2c57a', motif: '#a01e2c', gamosa: false, hat: null, bag: null, umbrella: null, phone: false, stick: null } },
+    wear: { female: true, hairStyle: 'bun', topStyle: 'blouse', top: '#8e1f2f', bottomStyle: 'mekhela', bottom: '#cdae6c', wrap: '#d8bd7f', motif: '#a3172b', fabric: 'silk', gamosa: false, hat: null, bag: null, umbrella: null, phone: false, stick: null } },
   mekhela_pat: { name: 'Pat mekhela sador', price: 150, desc: 'Ivory pat silk with green and red woven borders, and a green blouse.',
-    wear: { female: true, hairStyle: 'bun', topStyle: 'blouse', top: '#1f6a45', bottomStyle: 'mekhela', bottom: '#efe7d2', wrap: '#f2ebd8', motif: '#b3202e', gamosa: false, hat: null, bag: null, umbrella: null, phone: false, stick: null } },
+    wear: { female: true, hairStyle: 'bun', topStyle: 'blouse', top: '#1f6a45', bottomStyle: 'mekhela', bottom: '#efe6cf', wrap: '#f3ecd9', motif: '#b3202e', fabric: 'silk', gamosa: false, hat: null, bag: null, umbrella: null, phone: false, stick: null } },
   dhoti_kurta: { name: 'Dhoti, kurta and japi', price: 120, desc: 'A cream kurta, a white dhoti, a gamosa round the neck and a japi hat. Bihu dress for the dhol players.',
     wear: { female: false, hairStyle: 'short', topStyle: 'kurta', top: '#efe3c4', bottomStyle: 'dhoti', bottom: '#f4efe2', gamosa: true, hat: 'japi', wrap: null, bag: null, umbrella: null, phone: false, stick: null } },
   cash_bag: { name: 'Cash bag', price: 0, desc: 'Someone\'s bag of cash. Handle with care.', hint: 'This is not yours to open.' },

@@ -33,15 +33,15 @@ const face = (a, b) => [a, b];
 // ---------- look: partial Appearance per person (colours as css hex) ----------
 const A = {
   dadu: { skin: '#a9744c', hair: '#d4cfc6', hairStyle: 'short', top: '#f1e6c8', topStyle: 'kurta', bottom: '#efe9dc', bottomStyle: 'dhoti', gamosa: true, height: 0.97, build: 0.95 },
-  bina: { skin: '#a2694a', hair: '#1c1612', hairStyle: 'bun', top: '#8e2f5b', topStyle: 'blouse', bottom: '#d9b44a', bottomStyle: 'mekhela', wrap: '#f3ead2', height: 0.93 },
+  bina: { skin: '#a2694a', hair: '#1c1612', hairStyle: 'bun', top: '#8e2f5b', topStyle: 'blouse', bottom: '#d9b44a', bottomStyle: 'mekhela', wrap: '#f3ead2', motif: '#a3172b', fabric: 'silk', height: 0.93 },
   rinku: { skin: '#9a6540', hair: '#16110e', hairStyle: 'short', top: '#2a6fb5', topStyle: 'tshirt', bottom: '#2c3e50', bottomStyle: 'shorts', kid: true, height: 0.8 },
   moni: { skin: '#b07a52', hair: '#16110e', hairStyle: 'short', top: '#c0392b', topStyle: 'tshirt', bottom: '#33383f', bottomStyle: 'shorts', kid: true, height: 0.74 },
   bablu: { skin: '#8f5b3a', hair: '#16110e', hairStyle: 'cap', top: '#2e8b57', topStyle: 'tshirt', bottom: '#1f3a5f', bottomStyle: 'shorts', kid: true, height: 0.77 },
   purohit: { skin: '#a16a45', hair: '#1a1410', hairStyle: 'bald', top: '#e8892b', topStyle: 'robe', bottom: '#f2eadb', bottomStyle: 'dhoti', gamosa: true, height: 1.0 },
-  jonali: { skin: '#a8714a', hair: '#1c1612', hairStyle: 'long', top: '#e3b51e', topStyle: 'blouse', bottom: '#2f7d4f', bottomStyle: 'mekhela', wrap: '#f6efe0', height: 0.94 },
+  jonali: { skin: '#a8714a', hair: '#1c1612', hairStyle: 'long', top: '#e3b51e', topStyle: 'blouse', bottom: '#2f7d4f', bottomStyle: 'mekhela', wrap: '#f6efe0', motif: '#a3172b', fabric: 'cotton', height: 0.94 },
   khagen: { skin: '#946037', hair: '#2a2420', hairStyle: 'short', top: '#4a78a8', topStyle: 'shirt', bottom: '#2c2c34', bottomStyle: 'pants', gamosa: true, height: 1.02, build: 1.12 },
   mamoni: { skin: '#a46c47', hair: '#2a2420', hairStyle: 'bun', top: '#b0447a', topStyle: 'blouse', bottom: '#6a3d8a', bottomStyle: 'sari', wrap: '#6a3d8a', height: 0.95 },
-  rupa: { skin: '#9d6a48', hair: '#5a534d', hairStyle: 'bun', top: '#2b6f87', topStyle: 'blouse', bottom: '#d8a034', bottomStyle: 'mekhela', wrap: '#f3ead2', height: 0.92, build: 1.08 },
+  rupa: { skin: '#9d6a48', hair: '#5a534d', hairStyle: 'bun', top: '#2b6f87', topStyle: 'blouse', bottom: '#d8a034', bottomStyle: 'mekhela', wrap: '#f3ead2', motif: '#a3172b', fabric: 'cotton', height: 0.92, build: 1.08 },
   hari: { skin: '#8d5a3b', hair: '#1a1410', hairStyle: 'short', top: '#e8e0c8', topStyle: 'shirt', bottom: '#3a3a40', bottomStyle: 'pants', hat: 'cap', height: 0.99 },
   raju: { skin: '#8a5636', hair: '#16110e', hairStyle: 'short', top: '#6d7c5a', topStyle: 'shirt', bottom: '#2f3a4a', bottomStyle: 'pants', gamosa: true, height: 1.0 },
   dipen: { skin: '#a06a45', hair: '#16110e', hairStyle: 'short', top: '#2d4f87', topStyle: 'tshirt', bottom: '#3b3f48', bottomStyle: 'pants', bag: '#d1632c', hat: 'cap', height: 1.03 },

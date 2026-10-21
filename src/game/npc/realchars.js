@@ -253,14 +253,14 @@ function hemFor(a) { const b = a.bottomStyle; return b === 'shorts' ? (a.kid ? 0
 // Pieces are given in the bind pose (the T-pose the meshes are authored in) and weighted to bones; hand-held things are designed in the
 // idle pose and carried back to the bind pose with the hand bone's matrix, so they sit in the hand when the arm hangs down.
 class Acc {
-  constructor() { this.p = []; this.n = []; this.c = []; this.si = []; this.sw = []; this.ix = []; this.count = 0; }
-  // g: BufferGeometry (optionally moved by M); col: [r,g,b] or fn(i, x, y, z); infl: [[bone, weight], ...] or fn(i, x, y, z)
-  geo(g, col, infl, M) {
+  constructor() { this.p = []; this.n = []; this.c = []; this.uv = []; this.si = []; this.sw = []; this.ix = []; this.count = 0; }
+  // g: BufferGeometry (optionally moved by M); col: [r,g,b] or fn(i, x, y, z); infl: [[bone, weight], ...] or fn(i, x, y, z); uvT: optional (u, v) => [u, v] that remaps the geometry's uv (woven cloth samples one atlas)
+  geo(g, col, infl, M, uvT) {
     if (M) g.applyMatrix4(M); if (!g.attributes.normal) g.computeVertexNormals();
-    const pos = g.attributes.position, nor = g.attributes.normal, ix = g.index, base = this.count;
+    const pos = g.attributes.position, nor = g.attributes.normal, uv = g.attributes.uv, ix = g.index, base = this.count;
     for (let i = 0; i < pos.count; i++) {
-      const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i), c = typeof col === 'function' ? col(i, x, y, z) : col, f = typeof infl === 'function' ? infl(i, x, y, z) : infl;
-      this.p.push(x, y, z); this.n.push(nor.getX(i), nor.getY(i), nor.getZ(i)); this.c.push(c[0], c[1], c[2]);
+      const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i), c = typeof col === 'function' ? col(i, x, y, z) : col, f = typeof infl === 'function' ? infl(i, x, y, z) : infl, u = uv ? uv.getX(i) : 0, v = uv ? uv.getY(i) : 0, t = uvT ? uvT(u, v) : [u, v];
+      this.p.push(x, y, z); this.n.push(nor.getX(i), nor.getY(i), nor.getZ(i)); this.c.push(c[0], c[1], c[2]); this.uv.push(t[0], t[1]);
       for (let k = 0; k < 4; k++) { this.si.push(k < f.length ? f[k][0] : 0); this.sw.push(k < f.length ? f[k][1] : 0); }
     }
     if (ix) for (let i = 0; i < ix.count; i++) this.ix.push(base + ix.getX(i)); else for (let i = 0; i < pos.count; i++) this.ix.push(base + i);
@@ -268,7 +268,7 @@ class Acc {
   }
   build() {
     if (!this.count) return null; const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(this.p, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(this.n, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(this.c, 3));
+    g.setAttribute('position', new THREE.Float32BufferAttribute(this.p, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(this.n, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(this.c, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(this.uv, 2));
     g.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(this.si, 4)); g.setAttribute('skinWeight', new THREE.Float32BufferAttribute(this.sw, 4)); g.setIndex(this.ix); return g;
   }
 }
@@ -276,12 +276,12 @@ const rgb = hex => { _c.set(hex); return [_c.r, _c.g, _c.b]; };
 const mul = (c, k) => [c[0] * k, c[1] * k, c[2] * k];
 // a grid surface from P(u, v) -> [x, y, z], cols x rows quads, optionally closed around u (skirts)
 function grid(P, cols, rows, closed) {
-  const nc = closed ? cols : cols + 1, pos = new Float32Array(nc * (rows + 1) * 3), ix = [];
-  for (let r = 0; r <= rows; r++) for (let c = 0; c < nc; c++) { const q = P(c / cols, r / rows), o = (r * nc + c) * 3; pos[o] = q[0]; pos[o + 1] = q[1]; pos[o + 2] = q[2]; }
+  const nc = closed ? cols : cols + 1, pos = new Float32Array(nc * (rows + 1) * 3), uv = new Float32Array(nc * (rows + 1) * 2), ix = [];
+  for (let r = 0; r <= rows; r++) for (let c = 0; c < nc; c++) { const q = P(c / cols, r / rows), o = (r * nc + c) * 3, k = (r * nc + c) * 2; pos[o] = q[0]; pos[o + 1] = q[1]; pos[o + 2] = q[2]; uv[k] = c / cols; uv[k + 1] = r / rows; }
   for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
     const a = r * nc + c, b = r * nc + (c + 1) % nc, cc = (r + 1) * nc + c, d = (r + 1) * nc + (c + 1) % nc; ix.push(a, cc, b, b, cc, d);
   }
-  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setIndex(ix); g.computeVertexNormals(); return g;
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); g.setIndex(ix); g.computeVertexNormals(); return g;
 }
 const SEC = { rx: 0, zf: 0, zb: 0 };
 function torsoInfl(t, y) { // weights along the spine for something wrapped round the body
@@ -291,20 +291,32 @@ function torsoInfl(t, y) { // weights along the spine for something wrapped roun
   if (y >= t.pelvisY) { const w = (y - t.pelvisY) / (t.s1Y - t.pelvisY); return [[b.pelvis, 1 - w], [b.spine_01, w]]; }
   return [[b.pelvis, 1]];
 }
+// one point on a skirt: a around the body (0 = front, + = wearer's left), v from waist (0) to hem (1), out = extra radius
+function skirtPoint(t, o, a, v, out = 0) {
+  const gr = o.grow || 0.03; t.sec(o.top, SEC); const ax0 = SEC.rx + gr, az0 = (SEC.zf - SEC.zb) / 2 + gr, cz = (SEC.zf + SEC.zb) / 2;
+  const y = o.top + (o.hem - o.top) * v; t.sec(Math.max(y, SY0), SEC);
+  const fl = o.flare * Math.pow(v, 0.7), rv = o.rv || [0.08, 0.35], mn = o.room && v > rv[0] ? o.room * smooth(rv[0], rv[1], v) : 0, back = mn ? (o.back ?? 0.06) * smooth(0.12, 0.7, v) : 0; // room: a minimum radius for loose skirts so the thighs have space; legs swing back further than forward, so a loose skirt hangs a little behind
+  return [Math.sin(a) * (Math.max(ax0 + fl, SEC.rx + gr + 0.01, mn * 1.08) + out), y, cz - back + Math.cos(a) * (Math.max(az0 + fl, (SEC.zf - SEC.zb) / 2 + gr + 0.01, mn * (o.zk ?? 1)) + back + out)];
+}
+// weights for a skirt: pelvis, both thighs (so the middle of the front and back follows their average) and, low down, the calf on the vertex's own side
+function skirtInfl(t, o) {
+  const b = t.bi, span = o.top - o.hem || 1;
+  return (i, x, y) => {
+    const tw = o.tw || [0.1, 0.9], v = (o.top - y) / span, wt = o.thigh * smooth(tw[0], tw[1], v), s = smooth(-0.06, 0.06, x), sd = 2 * s - 1, wc = (o.calf || 0) * smooth(0.45, 1, v) * Math.abs(sd);
+    return [[b.pelvis, 1 - wt - wc], [b.thigh_l, wt * s], [b.thigh_r, wt * (1 - s)], [sd >= 0 ? b.calf_l : b.calf_r, wc]];
+  };
+}
 // a flared garment hanging from the waist, following both thighs a little so it does not stay rigid when sitting or striding.
 // o.grow is how far it stands off the body (the painted garments are puffed ~2.5 cm, so layers go outward from there).
-// o.motif (a colour) makes it a woven mekhela: finer grid, a motif border above the hem, small butas over the body and the
-// pleats tucked in at the front (real ripples plus a shade on every other fold).
+// o.motif (a colour) makes it a woven mekhela: finer grid and small butas over the body. With o.cloth the garment is textured (clothMaterial) instead of
+// painted by vertex colours: an open grid whose last column repeats the first, sampling the left half of the atlas; addPleats adds the folds.
 function addSkirt(acc, t, o) {
-  const S = o.motif ? 32 : 12, R = o.motif ? 16 : 6, b = t.bi, gr = o.grow || 0.03; t.sec(o.top, SEC);
-  const ax0 = SEC.rx + gr, az0 = (SEC.zf - SEC.zb) / 2 + gr, cz = (SEC.zf + SEC.zb) / 2;
-  const front = a => smooth(0.78, 0.92, Math.cos(a)); // the pleated panel: about 40 degrees either side of the front
-  const g = grid((u, v) => {
-    const y = o.top + (o.hem - o.top) * v; t.sec(Math.max(y, SY0), SEC); const fl = o.flare * Math.pow(v, 0.7), a = u * Math.PI * 2, mn = o.room && v > 0.08 ? o.room * smooth(0.08, 0.35, v) : 0; // room: a minimum radius for loose skirts so the thighs have space
-    const back = mn ? 0.06 * smooth(0.12, 0.7, v) : 0; // legs swing back further than forward, so a loose skirt hangs a little behind
-    const pleat = o.motif && Math.round(u * S) % 2 ? 0.016 * front(a) * smooth(0.04, 0.22, v) : 0;
-    return [Math.sin(a) * (Math.max(ax0 + fl, SEC.rx + gr + 0.01, mn * 1.08) + pleat), y, cz - back + Math.cos(a) * (Math.max(az0 + fl, (SEC.zf - SEC.zb) / 2 + gr + 0.01, mn) + back + pleat)];
-  }, S, R, true);
+  const S = o.motif ? 32 : 12, R = o.motif ? 16 : 6, front = a => smooth(0.78, 0.92, Math.cos(a)); // the pleated panel: about 40 degrees either side of the front
+  const g = grid((u, v) => { const a = u * Math.PI * 2, pleat = !o.cloth && o.motif && Math.round(u * S) % 2 ? 0.016 * front(a) * smooth(0.04, 0.22, v) : 0; return skirtPoint(t, o, a, v, pleat); }, S, R, !o.cloth);
+  if (o.cloth) { // one seam column: share its normals so the shading does not break at the front
+    const nor = g.attributes.normal; for (let r = 0; r <= R; r++) { const i = r * (S + 1), j = i + S, x = nor.getX(i) + nor.getX(j), y = nor.getY(i) + nor.getY(j), z = nor.getZ(i) + nor.getZ(j), l = Math.hypot(x, y, z) || 1; nor.setXYZ(i, x / l, y / l, z / l); nor.setXYZ(j, x / l, y / l, z / l); }
+    acc.geo(g, [1, 1, 1], skirtInfl(t, o), null, (u, v) => [0.5 * u, 1 - v]); return;
+  }
   const span = o.top - o.hem || 1, rimC = [o.col[0] * o.rim[0], o.col[1] * o.rim[1], o.col[2] * o.rim[2]];
   const plain = (i, x, y) => { const v = (o.top - y) / span; return v < 0.07 ? mul(o.col, 0.78) : v > 0.93 ? rimC : o.col; };
   const woven = i => { // grid vertex i = row * S + column (closed grid)
@@ -316,11 +328,17 @@ function addSkirt(acc, t, o) {
     if (r % 3 === 1 && r < R - 5 && c % 4 === (r % 2 ? 0 : 2)) return mul(M, 0.92);            // butas
     return c % 2 && Math.cos(c / S * Math.PI * 2) > 0.8 && r < R - 4 ? mul(o.col, 0.86) : o.col; // shade every other front pleat
   };
-  acc.geo(g, o.motif ? woven : plain,
-    (i, x, y) => { // pelvis, both thighs (so the middle of the front and back follows their average) and, low down, the calf on the vertex's own side
-      const v = (o.top - y) / span, wt = o.thigh * smooth(0.1, 0.9, v), s = smooth(-0.06, 0.06, x), sd = 2 * s - 1, wc = (o.calf || 0) * smooth(0.45, 1, v) * Math.abs(sd);
-      return [[b.pelvis, 1 - wt - wc], [b.thigh_l, wt * s], [b.thigh_r, wt * (1 - s)], [sd >= 0 ? b.calf_l : b.calf_r, wc]];
-    });
+  acc.geo(g, o.motif ? woven : plain, skirtInfl(t, o));
+}
+// the kochi: about nine deep folds tucked in at the waist a little right of centre, fanning out toward the hem
+function addPleats(acc, t, o) {
+  const A0 = -0.32, W = 0.42, N = 9;
+  const g = grid((u, v) => {
+    const w = W * (0.55 + 0.45 * smooth(0, 0.3, v)), a = A0 + (u - 0.5) * 2 * w;
+    const d = 0.017 * Math.abs(Math.sin(u * N * Math.PI)) * smooth(0, 0.08, u) * (1 - smooth(0.92, 1, u)) * smooth(0.14, 0.3, v); // below the blouse hem only: above it the folds would poke through
+    return skirtPoint(t, o, a, v, 0.006 + d);
+  }, 48, 12, false);
+  acc.geo(g, [1, 1, 1], skirtInfl(t, o), null, (u, v) => [0.5 * (0.42 + 0.16 * u), 1 - v]); // samples the skirt's own texture, hem border included
 }
 // a point on the torso's surface at height y and angle a (0 = front, +a toward the left), pushed out by grow; the shoulder cap widens it near the clavicles
 const GROW = 0.05;
@@ -344,6 +362,18 @@ function addWrap(acc, t, col, motif) {
     if (r === CR - 2) return c % 2 ? mul(motif, 0.85) : col;            // the end panel's motif run
     return r % 3 === 1 && c % 3 === (r % 2 ? 0 : 2) && r < CR - 4 ? motif : col; // butas
   }, (i, x, y) => torsoInfl(t, y));
+}
+// sador / pallu: from the right hip across the chest to the LEFT shoulder, over it, and the end (anchal) hanging down the back to mid-thigh.
+// uv.x runs along the cloth's length (0.5..1 of the atlas: the anchal is the end with the big motifs), uv.y across its width.
+function addSador(acc, t) {
+  const yS = t.clavY + 0.03, yH = t.pelvisY + 0.1, yEnd = t.pelvisY - 0.42, G = GROW + 0.008, AC = 2.35, AW = 0.55;
+  const along = (f0, f1) => (u, v) => [0.5 + 0.5 * (f0 + (f1 - f0) * u), v];
+  const sash = grid((u, v) => ringAt(t, yH + (yS - yH) * u + (v - 0.5) * 0.3, -1.2 + 2.4 * u, G + 0.035 * (1 - smooth(0, 0.55, u))), 24, 5, false);  // right hip -> left shoulder; stands off the blouse's flared hem at its start
+  acc.geo(sash, [1, 1, 1], (i, x, y) => torsoInfl(t, y), null, along(0, 0.5));
+  const over = grid((u, v) => ringAt(t, yS + 0.04 * Math.sin(u * Math.PI) + (v - 0.5) * 0.06, 1.2 + (AC - 1.2) * u, G + 0.01), 10, 3, false); // over the left shoulder
+  acc.geo(over, [1, 1, 1], (i, x, y) => torsoInfl(t, y), null, along(0.5, 0.62));
+  const anchal = grid((u, v) => { const y = yS - (yS - yEnd) * v, yy = Math.max(y, t.pelvisY), p = ringAt(t, yy, AC + (u - 0.5) * 2 * AW, G + 0.03 + 0.05 * smooth(0, 1, (t.pelvisY - y) / (t.pelvisY - yEnd))); p[1] = y; return p; }, 8, 16, false);
+  acc.geo(anchal, [1, 1, 1], (i, x, y) => torsoInfl(t, Math.max(y, t.pelvisY)), null, (u, v) => [0.5 + 0.5 * (0.62 + 0.38 * v), u]);
 }
 // gamosa: a band round the back of the neck and over the shoulders, then a strip hanging down each side of the chest to about the waist
 // (white cotton, red woven border at the ends and along the edges), standing a little off the body
@@ -370,16 +400,19 @@ function addHat(acc, t, kind, tint) {
 }
 // everything the character carries or wears on top of the painted body; returns null when there is nothing to add
 function buildDress(t, a) {
-  const acc = new Acc(), b = t.bi, H = t.H, k = H / 1.65, ts = a.topStyle, bs = a.bottomStyle, rim = [1, 0.86, 0.58], kid = !!a.kid;
+  const acc = new Acc(), cloth = new Acc(), b = t.bi, H = t.H, k = H / 1.65, ts = a.topStyle, bs = a.bottomStyle, rim = [1, 0.86, 0.58], kid = !!a.kid;
   const waist = t.pelvisY + 0.07, bot = rgb(a.bottom), top = rgb(a.top);
-  const motif = bs === 'mekhela' ? rgb(a.motif || a.top) : null; // the woven motifs; a mekhela's blouse is usually cut to match them
-  if (bs === 'mekhela' || bs === 'sari') addSkirt(acc, t, { top: waist, hem: H * 0.06, flare: 0.24, col: bot, rim, thigh: 0.6, calf: 0.35, room: 0.26 * t.H / 1.81, motif });
-  else if (bs === 'skirt') addSkirt(acc, t, { top: waist, hem: H * (kid ? 0.35 : 0.3), flare: 0.12, col: bot, rim: [1, 1, 1], thigh: 0.4 });
+  const motif = bs === 'mekhela' || bs === 'sari' ? rgb(a.motif || '#a3172b') : null; // the woven motifs, their own colour (red or gold on silk), not the blouse's
+  if (bs === 'mekhela' || bs === 'sari') {
+    // a mekhela is a straight tube with the pleats (kochi) tucked at the front right; a sari hangs much the same below the waist
+    const o = { top: waist, hem: H * 0.045, flare: bs === 'mekhela' ? 0.05 : 0.07, col: bot, rim, thigh: 0.85, calf: 0.3, room: 0.235 * t.H / 1.81, rv: [0.03, 0.2], tw: [0, 0.4], back: 0.1, zk: 1.1, motif, cloth: true }; // room from just below the waist and the cloth following the thighs from the top: a tight tube still has to let a stride through
+    addSkirt(cloth, t, o); addPleats(cloth, t, o);
+  } else if (bs === 'skirt') addSkirt(acc, t, { top: waist, hem: H * (kid ? 0.35 : 0.3), flare: 0.12, col: bot, rim: [1, 1, 1], thigh: 0.4 });
   else if (bs === 'dhoti') addSkirt(acc, t, { top: waist, hem: H * 0.15, flare: 0.1, col: bot, rim: [1, 1, 1], thigh: 0.4, calf: 0.25, room: 0.22 * t.H / 1.81 });
   if (ts === 'kurta') addSkirt(acc, t, { top: waist + 0.05, hem: H * 0.31, flare: 0.08, col: top, rim: [1, 1, 1], thigh: 0.35, grow: 0.05 });
   else if (ts === 'robe') addSkirt(acc, t, { top: waist + 0.05, hem: H * 0.28, flare: 0.13, col: top, rim: [1, 1, 1], thigh: 0.4, grow: 0.05 });
   else if (ts === 'blouse') addSkirt(acc, t, { top: waist + 0.06, hem: t.pelvisY - 0.06, flare: 0.04, col: top, rim: [1, 1, 1], thigh: 0.1, grow: 0.045 });
-  if (a.wrap) addWrap(acc, t, rgb(a.wrap), motif);
+  if (a.wrap) { if (bs === 'mekhela' || bs === 'sari') addSador(cloth, t); else addWrap(acc, t, rgb(a.wrap), motif); }
   if (a.gamosa) addGamosa(acc, t);
   const hat = a.hat || (a.hairStyle === 'cap' ? 'cap' : null);
   if (hat) addHat(acc, t, hat, rgb(a.hatColor || CAPS[(a.top.charCodeAt(1) + a.top.charCodeAt(3)) % CAPS.length]));
@@ -395,10 +428,33 @@ function buildDress(t, a) {
     if (back) { t.sec(t.s3Y, SEC); const g = new THREE.BoxGeometry(SEC.rx * 1.3, 0.34 * k, 0.13 * k); g.translate(0, t.s3Y + 0.03, SEC.zb - 0.05 - 0.065 * k); acc.geo(g, rgb(a.bag), [[b.spine_03, 1]]); }
     else { const h = hold ? hl : hr, g = new THREE.BoxGeometry(0.1 * k, 0.2 * k, 0.16 * k); g.translate(h.x, h.y - 0.13 * k, h.z); acc.geo(g, rgb(a.bag), hold ? L : R, hold ? t.Mhand.l : t.Mhand.r); }
   }
-  return acc.build();
+  return { props: acc.build(), cloth: cloth.build() };
 }
 let PROP_MAT = null;
 const propMaterial = () => PROP_MAT || (PROP_MAT = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, metalness: 0, side: THREE.DoubleSide }));
+
+// one 1024 x 512 canvas per outfit: left half the mekhela (x around the body, y from the waist down to the hem),
+// right half the sador (x along its length, the last eighth the anchal; y across its width). Shared across rigs by colour key.
+const CLOTH = new Map();
+function clothMaterial(base, sador, motif, silk) {
+  const key = [base, sador, motif, silk].join(); if (CLOTH.has(key)) return CLOTH.get(key);
+  const cv = document.createElement('canvas'); cv.width = 1024; cv.height = 512; const g = cv.getContext('2d');
+  const dia = (cx, cy, r, c) => { g.fillStyle = c; g.beginPath(); g.moveTo(cx, cy - r); g.lineTo(cx + r, cy); g.lineTo(cx, cy + r); g.lineTo(cx - r, cy); g.closePath(); g.fill(); };
+  // mekhela: plain body with sparse butas, a woven border above the hem (thin line, a run of stepped lozenges, a solid edge)
+  g.fillStyle = base; g.fillRect(0, 0, 512, 512);
+  g.globalAlpha = 0.06; g.fillStyle = '#000'; for (let x = 0; x < 512; x += 3) g.fillRect(x, 0, 1, 512); g.globalAlpha = 1;
+  for (let row = 0; row < 9; row++) for (let col = 0; col < 16; col++) { const y = 140 + row * 30, x = col * 32 + (row % 2) * 16 + 8; if (y < 400) dia(x, y, 4, motif); }
+  g.fillStyle = motif; g.fillRect(0, 418, 512, 4); g.fillRect(0, 486, 512, 3); g.fillRect(0, 494, 512, 18);
+  for (let x = 0; x < 512; x += 24) { dia(x + 12, 454, 15, motif); dia(x + 12, 454, 8, base); dia(x + 12, 454, 3, motif); }
+  // sador: borders along both long edges with a motif run inside them; the anchal end carries rows of big motifs
+  g.fillStyle = sador; g.fillRect(512, 0, 512, 512);
+  g.fillStyle = motif; g.fillRect(512, 0, 512, 24); g.fillRect(512, 488, 512, 24); g.fillRect(890, 0, 4, 512);
+  for (let x = 522; x < 1024; x += 22) { dia(x, 40, 7, motif); dia(x, 472, 7, motif); }
+  for (let row = 0; row < 6; row++) for (let x = 905; x < 1024; x += 30) dia(x + (row % 2) * 15, 80 + row * 64, 13, motif);
+  const map = new THREE.CanvasTexture(cv); map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 4;
+  const m = new THREE.MeshPhysicalMaterial({ map, roughness: silk ? 0.5 : 0.85, sheen: silk ? 0.8 : 0.25, sheenRoughness: silk ? 0.35 : 0.8, sheenColor: new THREE.Color(silk ? '#fff0c4' : '#ffffff'), side: THREE.DoubleSide });
+  CLOTH.set(key, m); return m;
+}
 
 // ---------- hair choice ----------
 function hairFor(a, female) {
@@ -422,7 +478,7 @@ function makeRig(t) {
   for (const s of ['l', 'r']) root.getObjectByName('upperarm_' + s).position.add(t.shift[s]);
   const cb = t.corr.map(c => ({ bone: root.getObjectByName(c.n), k: c.k, q: c.q, rest: c.rest }));
   const bn = {}; for (const n of AXB) bn[n] = root.getObjectByName(n);
-  const rig = { cb, cw: new Float32Array(4), cwSet: false, t, root, body, eyes, brows, bodyMat, browMat, hairMats, head, hair: mk(), beard: mk(), props: null, mixer: new THREE.AnimationMixer(root), ent: {}, tw: {}, tm: {}, bn, fq: 1, fresh: true, trk: [], trkOf: new Map() };
+  const rig = { cb, cw: new Float32Array(4), cwSet: false, t, root, body, eyes, brows, bodyMat, browMat, hairMats, head, hair: mk(), beard: mk(), props: null, cloth: null, mixer: new THREE.AnimationMixer(root), ent: {}, tw: {}, tm: {}, bn, fq: 1, fresh: true, trk: [], trkOf: new Map() };
   root.visible = false; return rig;
 }
 function dress(rig, a, female) {
@@ -441,12 +497,13 @@ function dress(rig, a, female) {
   rig.beard.visible = !!(beard && bs); if (bs) { rig.beard.geometry = bs.geometry; rig.beard.material = rig.hairMats[0]; }
   rig.head.scale.setScalar(a.kid ? 1.25 : 1);
   // dress: rebuilt on every change (small, and changes are rare)
-  const g = buildDress(t, a);
-  if (!rig.props) {
-    if (!g) return;
-    const m = new THREE.SkinnedMesh(g, propMaterial()); m.frustumCulled = false; m.castShadow = true; m.userData.noMerge = true;
-    rig.body.parent.add(m); m.bind(rig.body.skeleton, rig.body.bindMatrix); rig.props = m;
-  } else { if (g) { const old = rig.props.geometry; rig.props.geometry = g; old.dispose(); } rig.props.visible = !!g; }
+  const d = buildDress(t, a), cmat = d.cloth && clothMaterial(a.bottom, a.wrap || a.bottom, a.motif || '#a3172b', a.fabric === 'silk');
+  const put = (key, g, mat) => { // one skinned mesh per kind of piece (painted props, woven cloth), made on first use and re-filled on every re-dress
+    let m = rig[key];
+    if (!m) { if (!g) return; m = new THREE.SkinnedMesh(g, mat); m.frustumCulled = false; m.castShadow = true; m.userData.noMerge = true; rig.body.parent.add(m); m.bind(rig.body.skeleton, rig.body.bindMatrix); rig[key] = m; return; }
+    if (g) { const old = m.geometry; m.geometry = g; m.material = mat; old.dispose(); } m.visible = !!g;
+  };
+  put('props', d.props, propMaterial()); put('cloth', d.cloth, cmat);
 }
 
 // ---------- the character ----------
@@ -594,7 +651,7 @@ function makeRealCharacter(appearance = {}, opts = {}) {
   }
   function dispose() {
     if (group.parent) group.parent.remove(group);
-    for (const r of [rigs.male, rigs.female]) if (r) { r.mixer.stopAllAction(); r.mixer.uncacheRoot(r.root); r.bodyMat.dispose(); r.browMat.dispose(); r.hairMats.forEach(m => m.dispose()); if (r.props) r.props.geometry.dispose(); }
+    for (const r of [rigs.male, rigs.female]) if (r) { r.mixer.stopAllAction(); r.mixer.uncacheRoot(r.root); r.bodyMat.dispose(); r.browMat.dispose(); r.hairMats.forEach(m => m.dispose()); if (r.props) r.props.geometry.dispose(); if (r.cloth) r.cloth.geometry.dispose(); }
   }
   const out = { group, animate, setAppearance, height: BASE_H, dispose };
   if (opts.warm) { rigOf('male'); rigOf('female'); }
