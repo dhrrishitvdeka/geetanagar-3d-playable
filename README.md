@@ -1,44 +1,54 @@
-# Geetanagar 3D
+# Geetanagar 3D: the game
 
-A walkable 3D replica of Geetanagar, Guwahati (Assam), built with three.js and Vite.
+A walk-around 3D game set in Geetanagar, a neighbourhood of Guwahati, Assam. Walk Mother Teresa Rd from Hatigarh Chariali to the
+mandir, drink lal sah at Bina Baideu's stall, kick a ball about with the kids on the field, and dance the Rongali Bihu in the
+evening. Built with three.js and Vite; everything you see (buildings, people, vehicles, sounds) is made in code or from free CC0 assets.
 
-On Windows, double-click `run.bat`: it installs dependencies the first time and opens the game in its own Edge (or Chrome, Brave)
-window on the laptop's dedicated GPU (`scripts/open-gpu.js`; Chromium browsers otherwise give WebGL the integrated GPU). Or by hand:
+## Run it
+
+You need [Node.js](https://nodejs.org) 20 or newer.
+
+On Windows, double-click `run.bat`: it installs dependencies on the first run and opens the game in its own browser window on the
+laptop's dedicated GPU. Or by hand:
 
 ```
 npm install
-npm run dev        # http://localhost:5173
+npm run dev        # then open http://localhost:5173/game.html
 npm run build      # static build in dist/
 ```
 
-## Layout
+Add `?autostart` to the address to skip the title menu, or `?fps` for a frame-rate readout that names the GPU in use.
+`http://localhost:5173/` is the free-roam explorer of the same map.
 
-| Path | What it is |
-|---|---|
-| `index.html`, `src/style.css` | Page shell and HUD |
-| `src/main.js` | Boot, UI wiring, render loop |
-| `src/core/` | `context.js` (renderer, scene, camera), `geo.js` (loads `data/geo.json`, terrain height `hAt`, class raster `clsAt`) |
-| `src/world/` | Terrain, buildings, Mother Teresa Rd (`mainroad.js`), lanes/field/park (`streets.js`), View point deck, sky, lighting, outer ring, mandir gate, kiosks and shopfronts, landmarks, Hatigarh stalls/traffic/poles (`streetlife.js`) |
-| `src/veg/` | Asset loading, EZ-Tree trees with near/far LOD, grass and flowers |
-| `src/ui/` | Walk/aerial controls, labels, minimap |
-| `src/dev/shots.js` | Dev-only: fixed comparison viewpoints, saved through the `/__shot` endpoint |
-| `data/geo.json` | Footprints, roads, class raster, terrain grid, field/park polygons, labels (local metres, x = east, y = north, origin 26.1735 N, 91.7900 E) |
-| `public/assets/` | Textures, GLB models, HDRI |
-| `pipeline/` | Offline data tools (Python); runtime never imports from here |
-| `screenshots/<milestone>/` | Comparison captures from the five standard viewpoints |
+## What's in it
 
-## Game
+- **The neighbourhood.** About 1,500 buildings from the real footprints, with shopfronts, compound walls and gates, posters and
+  painted ads, potted plants on the walls, DTH dishes and washing on the roofs, the field, the Children's Park, the mandir and
+  the View point on the hill.
+- **People who live there.** Shopkeepers behind their counters, hawkers calling out, regulars who leave their gates in the morning
+  to catch the bus, go to school or do the shopping, and come home in the evening. Elders sit at the namghar for the evening
+  kirtan. Walkers keep to the footpath, wait for a gap in the traffic, stop to watch the football and remember if you bump them.
+- **Friendships.** Talk to people every day, help them and bring them things they like: they greet you by name, give you a
+  discount and the odd present. The journal keeps track of everyone you have met.
+- **Quests.** Dadu's morning tea, a lost ball and a football match, flowers for the puja, a dog called Pori, a photo walk,
+  parcel runs, a hunt for gamosas, and the Rongali Bihu chapter (wear a mekhela sador or a dhoti and kurta and join the dance).
+- **Traffic.** Hatchbacks, sedans, SUVs, Activa- and Splendor-style two-wheelers with their riders, CNG autos, totos, city buses
+  that stop at the bus stand, Tata Aces and cycle-rickshaws.
+- **Sound.** Synthesised in the browser: temple bells, conch shells at dawn and dusk, pressure cookers at lunchtime, school
+  bells, kirtan, the tea stall, horns and the dhol.
+- **A day.** The clock runs from 6:30 am to 6 pm, and the town changes with it: the morning rush, the quiet midday heat, the
+  busy evening.
 
-A third-person game on the same map lives at `game.html` (`http://localhost:5173/game.html` while the dev server runs; `run.bat` opens it directly, and the explorer's title card links to it). Add `?autostart` to the address to skip the title menu. Add `?fps` for a frame-rate readout that also names the GPU in use.
+## Controls
 
 | Keys | Action |
 |---|---|
 | `W` `A` `S` `D` / arrows | Move, relative to the camera |
-| Mouse (click the view first) | Look; wheel zooms the camera |
+| Mouse (click the view first) | Look; the wheel zooms |
 | `Shift` | Sprint (uses stamina) |
-| `C` / `Ctrl` | Crouch on or off (slower and quieter; sprint or jump stands you up) |
+| `C` / `Ctrl` | Crouch |
 | `Space` | Jump |
-| `E` / `F` | Interact; get off a vehicle |
+| `E` / `F` | Talk, interact, get off a vehicle |
 | `V` | First person on or off |
 | `M` `J` `I` / `Tab` | Map, journal, inventory |
 | `P` | Photo |
@@ -47,25 +57,22 @@ A third-person game on the same map lives at `game.html` (`http://localhost:5173
 
 On a touch screen the joystick moves and dragging the view looks around.
 
-Code is in `src/game/`; the module contract (coordinates, events, exports) is `docs/game.md`.
+## Layout
 
 | Path | What it is |
 |---|---|
-| `src/game/main.js` | Boot, title backdrop, pause, saving, frame loop |
-| `src/game/player.js`, `input.js` | Character controller, camera, vehicles; keys, touch and the joystick as one action map |
-| `src/game/core/` | `state.js` (money, inventory, clock, save slot), `bus.js` (events) |
-| `src/game/npc/`, `animals.js`, `traffic.js` | People, animals and moving traffic |
-| `src/game/hud.js`, `map.js`, `audio.js` | Menus and HUD, full map, procedural sound |
-| `src/game/quests.js`, `content/`, `interact.js`, `items.js`, `worldobjects.js` | Quests, places, things to do |
+| `game.html`, `src/game/` | The game: player, people (`npc/`), animals, traffic, quests and content, friendships, HUD, map, sound |
+| `index.html`, `src/main.js` | The free-roam explorer |
+| `src/core/` | Renderer, scene and camera; map data and terrain height |
+| `src/world/` | Terrain, buildings and shopfronts, roads, walls, the field and park, props, vehicles, sky |
+| `src/veg/` | Trees, palms, grass and flowers |
+| `src/render/`, `src/ui/` | Quality presets and batching; walk controls, labels, minimap |
+| `data/` | Map data: footprints, roads, terrain, labels |
+| `public/assets/` | Textures, character and tree models, HDRI |
 
-## Comparison screenshots
+Coordinates are local metres (x east, y north); three.js is y-up, so a map point `(x, y)` at height `h` is `Vector3(x, h, -y)`.
 
-With `npm run dev` running and the page open, run this in the browser console:
+## Credits
 
-```js
-await __geet.shots('m1')   // writes screenshots/m1/{viewpoint,field,mandir,hatigarh,aerial}.png
-```
-
-## Coordinates
-
-World space is three.js y-up: a map point `(x, y)` at height `h` sits at `new Vector3(x, h, -y)` (helper `P` in `core/geo.js`).
+Libraries and assets, with their licences, are listed in [CREDITS.md](CREDITS.md). Map footprints were traced for this project
+from map imagery; road names are © OpenStreetMap contributors (ODbL); terrain is from the Copernicus GLO-30 DEM.
