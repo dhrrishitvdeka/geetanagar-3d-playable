@@ -86,11 +86,11 @@ const M = {
   lawn: new THREE.MeshStandardMaterial({ map: TEX.lawn, roughness: 1, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 }),
   brick: new THREE.MeshStandardMaterial({ ...PBR.brick, bumpScale: 2, roughness: 1 }),
   black: new THREE.MeshStandardMaterial({ color: '#1d1e20', roughness: 0.55, metalness: 0.5 }),
-  railInfill: new THREE.MeshStandardMaterial({ color: '#1d1e20', map: T.railBars(), alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.55, metalness: 0.5 }),
+  railInfill: new THREE.MeshStandardMaterial({ color: '#1d1e20', map: T.railBars(), alphaTest: 0.5, alphaToCoverage: QUALITY !== 'low', side: THREE.DoubleSide, roughness: 0.55, metalness: 0.5 }),
   fieldPanel: new THREE.MeshStandardMaterial({ map: T.fieldPanel(), roughness: 0.7, metalness: 0.2 }),
   // Baikuntha Rd side of the field: brick wall painted terracotta red, chain-link above it (Street View, Mar 2026)
   redWall: new THREE.MeshStandardMaterial({ ...PBR.concrete, color: '#c4604a', bumpScale: 1.5, roughness: 1 }),
-  chainLink: new THREE.MeshStandardMaterial({ color: '#9aa0a3', map: T.chainLink(), alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.5, metalness: 0.6 }),
+  chainLink: new THREE.MeshStandardMaterial({ color: '#9aa0a3', map: T.chainLink(), alphaTest: 0.5, alphaToCoverage: QUALITY !== 'low', side: THREE.DoubleSide, roughness: 0.5, metalness: 0.6 }),
   yellow: new THREE.MeshStandardMaterial({ color: '#d9b62b', roughness: 0.6, metalness: 0.2 }),
   maroon: new THREE.MeshStandardMaterial({ color: '#7d2630', roughness: 0.6 }),
   white: new THREE.MeshStandardMaterial({ color: '#f1efe8', roughness: 0.8 }),
