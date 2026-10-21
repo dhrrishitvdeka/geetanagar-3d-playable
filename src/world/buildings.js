@@ -115,7 +115,10 @@ function buildAll() {
     // ---- walls: plinth band below the ground floor, then the facade ----
     const vOff = s2 < 0.5 ? 0 : 0.5;
     for (let i = 0; i < n; i++) {
-      const e = E[i], uOff = hash2(i + 3.3, s) < 0.5 ? 0 : 0.5, plinthTop = top + (isTin ? 0.45 : 0), zWin = Math.max(plinthTop, e.hid);
+      const e = E[i], uOff = hash2(i + 3.3, s) < 0.5 ? 0 : 0.5;
+      const eg = Math.max(e.gA, e.gB), low = !isTin && top - eg > 1.0 ? eg + 0.3 : null; // downhill wall: the floors continue down to this wall's own ground
+      const plinthTop = low !== null ? low : top + (isTin ? 0.45 : 0); e.low = low;
+      const zWin = Math.max(plinthTop, e.hid);
       const Wf = !e.win ? W.blank : (e.front || style === 'assam') ? W[style] : (W.side || W[style]); // W.side arrives in M3
       wall(W.blank, e.p, e.q, e.n, z0, plinthTop, wallCol.clone().multiplyScalar(isTin ? 0.8 : 0.92), top, uOff, vOff, e.gA, e.gB);
       if (zWin > plinthTop) wall(W.blank, e.p, e.q, e.n, plinthTop, zWin, wallCol, top, uOff, vOff, e.gA, e.gB); // hidden by the neighbour
@@ -129,8 +132,8 @@ function buildAll() {
       for (let i = 0; i < n; i++) {
         const e = E[i]; if (e.L < 1.2) continue;
         const g = Math.min(e.gA, e.gB);
-        for (let k = 0; k < floors; k++) {
-          const fb = top + k * FLOOR;
+        for (let k = e.low != null ? -Math.floor((top - e.low) / FLOOR) : 0; k < floors; k++) {
+          const fb = top + k * FLOOR; if (fb + FLOOR <= (e.low ?? -Infinity) + 0.4) continue;
           // floor slab edge at the top of every storey
           trim.box(e.p, e.u, e.n, -0.04, e.L + 0.04, -0.02, 0.09, fb + FLOOR - 0.2, fb + FLOOR, trimCol, 'f', g);
           // chajja (sunshade) over the window row
