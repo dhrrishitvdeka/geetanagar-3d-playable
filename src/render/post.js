@@ -6,6 +6,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { camera, renderer, scene } from '../core/context.js';
 import { setShadowSize, setShadowsEnabled } from '../world/lighting.js';
+import { sky } from '../world/sky.js';
 
 // ---------- post-processing and quality presets ----------
 // High: GTAO + bloom + MSAA, 4k shadows. Medium: MSAA, 2k shadows. Low: direct render, no shadows, no composer.
@@ -44,6 +45,7 @@ function build() {
   const w = renderer.domElement.clientWidth || 1, h = renderer.domElement.clientHeight || 1;
   if (Q.shadow) { setShadowsEnabled(true); setShadowSize(Q.shadow); } else setShadowsEnabled(false);
   camera.far = Q.far; camera.updateProjectionMatrix();
+  sky.scale.setScalar(Math.min(9000, Q.far * 1.1)); // the box corner sits at scale * 0.866, so it stays inside the far plane
   renderer.setPixelRatio(pixelRatio());
   if (composer) composer.dispose();
   composer = null; aoPass = null; bloomPass = null;

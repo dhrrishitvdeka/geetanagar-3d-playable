@@ -38,7 +38,7 @@ function refreshEnv(t = 0, rebake = true) {
   envDirty = false;
   // without the sun disc: the directional light already carries the sun, and the disc would blow out the ambient
   U.showSunDisc.value = 0; envScene.add(sky);
-  const rt = pmrem.fromScene(envScene, 0, 0.1, 5000);
+  const rt = pmrem.fromScene(envScene, 0, 0.1, 10000);
   U.showSunDisc.value = 1; scene.add(sky);
   if (envRT) envRT.dispose();
   envRT = rt; scene.environment = rt.texture;
