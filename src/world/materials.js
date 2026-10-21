@@ -96,6 +96,22 @@ const M = {
   white: new THREE.MeshStandardMaterial({ color: '#f1efe8', roughness: 0.8 }),
   steel: new THREE.MeshStandardMaterial({ color: '#8e9499', roughness: 0.4, metalness: 0.6 }),
 };
+// road anti-tiling: the asphalt texture repeats every 8 m, so a slow world-space value noise (a patch every ~20 m, plus a finer one) varies its brightness by +-12%.
+// terrain.js does the same with its noise texture; this one is procedural so the road materials need no extra sampler.
+function antiTile(m) {
+  const prev = m.onBeforeCompile;
+  m.onBeforeCompile = function (sh) {
+    if (prev) prev.call(this, sh);
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vAT;').replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nvAT = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
+varying vec3 vAT;
+float atH(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float atN(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(atH(i), atH(i + vec2(1.0, 0.0)), f.x), mix(atH(i + vec2(0.0, 1.0)), atH(i + vec2(1.0, 1.0)), f.x), f.y); }`)
+      .replace('#include <map_fragment>', '#include <map_fragment>\ndiffuseColor.rgb *= 0.88 + 0.24 * (atN(vAT.xz * 0.05) * 0.65 + atN(vAT.xz * 0.21) * 0.35);');
+  };
+  m.customProgramCacheKey = () => (m.userData.pck || 'std') + 'antitile';
+}
+antiTile(M.asphalt); antiTile(M.laneAsphalt);
 M.laneDust = M.dust.clone(); M.laneDust.color = new THREE.Color(1.08, 0.88, 0.7); // the lane edges fade into reddish dust
 const box = (w, h, d, mat) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
 const std = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.75, ...extra });
