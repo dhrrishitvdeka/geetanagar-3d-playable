@@ -94,6 +94,7 @@ function buildKind(kind, cap) { // the paint and the rider's shirt take a colour
   if (paint.length) meshes.push(instMesh(paint.length === 1 ? paint[0] : mergeGeometries(paint, false), paintMat, cap, true, true));
   if (rest.length) meshes.push(instMesh(rest.length === 1 ? rest[0] : mergeGeometries(rest, false), REST, cap, false, true));
   if (shirt.length) meshes.push(instMesh(shirt.length === 1 ? shirt[0] : mergeGeometries(shirt, false), shirtMat, cap, true, true));
+  meshes.forEach((m, k) => { m.name = 'traffic_' + kind + '_' + ['paint', 'rest', 'shirt'][k]; });
   return { meshes, n: 0, live: 0, cap, tinted: paint.length > 0, shirted: shirt.length > 0 };
 }
 
@@ -301,7 +302,9 @@ function updateTraffic(dt, player) {
   }
   for (const kind of MIX) KS[kind].n = 0;
   for (let k = 0; k < LIVE.length; k++) writeVeh(LIVE[k]);
-  for (const kind of MIX) { const ks = KS[kind]; for (let m = 0; m < ks.meshes.length; m++) { const im = ks.meshes[m]; im.count = ks.n; if (ks.n) { im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; } } }
+  for (const kind of MIX) { const ks = KS[kind]; for (let m = 0; m < ks.meshes.length; m++) { const im = ks.meshes[m]; im.count = ks.n; if (ks.n) { // only the first n instances were written: upload just those (the crowd.js pattern)
+    im.instanceMatrix.clearUpdateRanges(); im.instanceMatrix.addUpdateRange(0, ks.n * 16); im.instanceMatrix.needsUpdate = true;
+    if (im.instanceColor) { im.instanceColor.clearUpdateRanges(); im.instanceColor.addUpdateRange(0, ks.n * 3); im.instanceColor.needsUpdate = true; } } } }
 }
 function vehicleAt(x, y, r = 0.5) { // oriented rectangle (rounded by r) against the moving fleet
   for (let k = 0; k < LIVE.length; k++) {

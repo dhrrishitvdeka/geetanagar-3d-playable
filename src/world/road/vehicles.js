@@ -285,7 +285,7 @@ function flushVehicles() {
   for (const kind in QUEUE) {
     const list = QUEUE[kind]; if (!list.length) continue;
     for (const [m, geo] of baked(kind)) {
-      const im = new THREE.InstancedMesh(geo, m, list.length);
+      const im = new THREE.InstancedMesh(geo, m, list.length); im.name = 'parked_vehicles';
       list.forEach(([x, h, y, a, c], k) => { dm.position.set(x, h, -y); dm.rotation.set(0, a, 0); dm.updateMatrix(); im.setMatrixAt(k, dm.matrix); if (m.userData.tint) im.setColorAt(k, c); });
       im.castShadow = true; im.receiveShadow = true; im.computeBoundingSphere(); scene.add(im);
     }

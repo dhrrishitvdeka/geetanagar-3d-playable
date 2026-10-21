@@ -159,7 +159,7 @@ function chairParts() { // a moulded plastic chair; the origin is where the hips
 }
 function buildChairs() {
   const parts = chairParts(), g = mergeGeometries(parts, false); for (const p of parts) p.dispose();
-  chairMesh = new THREE.InstancedMesh(g, MAT_SOLID, CHAIR_CAP); chairMesh.count = 0; chairMesh.castShadow = chairMesh.receiveShadow = true;
+  chairMesh = new THREE.InstancedMesh(g, MAT_SOLID, CHAIR_CAP); chairMesh.count = 0; chairMesh.castShadow = chairMesh.receiveShadow = true; chairMesh.name = 'chairs';
   chairMesh.frustumCulled = false; chairMesh.userData.noMerge = true; scene.add(chairMesh);
 }
 // a chair at (x, y) facing map angle h, registered as a one-person seat; null when there is no room left (or before init)
@@ -178,7 +178,7 @@ function buildPumps() {
   }
   // one InstancedMesh for the handles (the only moving part); pivot at the head of the pump
   const geo = BOX(0.9, 0.04, 0.05); geo.translate(-0.42, 0, 0);
-  handles = new THREE.InstancedMesh(geo, new THREE.MeshStandardMaterial({ color: '#1f2326', roughness: 0.5, metalness: 0.6 }), PUMPS.length);
+  handles = new THREE.InstancedMesh(geo, new THREE.MeshStandardMaterial({ color: '#1f2326', roughness: 0.5, metalness: 0.6 }), PUMPS.length); handles.name = 'pump_handles';
   handles.frustumCulled = false; handles.userData.noMerge = true; scene.add(handles);
   PUMPS.forEach((P, i) => setHandle(i, -0.45));
 }
@@ -378,8 +378,8 @@ function glowTex() {
 }
 function buildGamosas() {
   const ct = clothTex();
-  gamCloth = new THREE.InstancedMesh(BOX(0.62, 0.05, 0.4), new THREE.MeshStandardMaterial({ map: ct, emissive: '#ffd9b0', emissiveMap: ct, emissiveIntensity: 0.35, roughness: 0.9 }), GAMOSA_SPOTS.length);
-  gamGlow = new THREE.InstancedMesh(new THREE.PlaneGeometry(1.7, 1.7), new THREE.MeshBasicMaterial({ map: glowTex(), color: '#ffe3b0', transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }), GAMOSA_SPOTS.length);
+  gamCloth = new THREE.InstancedMesh(BOX(0.62, 0.05, 0.4), new THREE.MeshStandardMaterial({ map: ct, emissive: '#ffd9b0', emissiveMap: ct, emissiveIntensity: 0.35, roughness: 0.9 }), GAMOSA_SPOTS.length); gamCloth.name = 'gamosa_cloth';
+  gamGlow = new THREE.InstancedMesh(new THREE.PlaneGeometry(1.7, 1.7), new THREE.MeshBasicMaterial({ map: glowTex(), color: '#ffe3b0', transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }), GAMOSA_SPOTS.length); gamGlow.name = 'gamosa_glow';
   for (const m of [gamCloth, gamGlow]) { m.frustumCulled = false; m.castShadow = false; m.receiveShadow = false; m.userData.noMerge = true; scene.add(m); }
   GAMOSA_SPOTS.forEach(([x0, y0], i) => { const [x, y] = open(x0, y0); GAM.push({ id: `gamosa_${i + 1}`, x, y, z: groundAt(x, y), got: false, shown: false }); });
   refreshGamosas();

@@ -115,9 +115,9 @@ function buildPoles() {
   }
   // square-section prestressed concrete pole, tapering; galvanised cross-arm with white pin insulators
   const pg = new THREE.CylinderGeometry(0.1, 0.17, 1, 4, 1); pg.rotateY(Math.PI / 4); pg.translate(0, 0.5, 0);
-  const pm = new THREE.InstancedMesh(pg, M.poleConcrete, poles.length);
-  const am = new THREE.InstancedMesh(new THREE.BoxGeometry(1.7, 0.08, 0.08), std('#55595c', { metalness: 0.5, roughness: 0.5 }), poles.length * 2);
-  const ins = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.035, 0.05, 0.16, 8), std('#e9e6dc', { roughness: 0.3 }), poles.length * 6);
+  const pm = new THREE.InstancedMesh(pg, M.poleConcrete, poles.length); pm.name = 'poles';
+  const am = new THREE.InstancedMesh(new THREE.BoxGeometry(1.7, 0.08, 0.08), std('#55595c', { metalness: 0.5, roughness: 0.5 }), poles.length * 2); am.name = 'pole_arms';
+  const ins = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.035, 0.05, 0.16, 8), std('#e9e6dc', { roughness: 0.3 }), poles.length * 6); ins.name = 'pole_insulators';
   const dm = new THREE.Object3D(); let ai = 0, ii = 0;
   poles.forEach((p, k) => {
     const ang = p.main ? Math.atan2(NRM[p.i][1], NRM[p.i][0]) : (k * 1.7) % 3.14;

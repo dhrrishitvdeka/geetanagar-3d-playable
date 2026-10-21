@@ -39,7 +39,7 @@ function buildFieldEdge(Q, a, s, o, H, shoulder) {
     const m = [(p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2]; if (inGate(m)) continue;
     panels.push([m[0], m[1], Math.atan2(p1[1] - p0[1], p1[0] - p0[0])]);
   }
-  const pm = new THREE.InstancedMesh(new THREE.BoxGeometry(0.4, 0.4, 0.03), M.fieldPanel, panels.length), dm = new THREE.Object3D();
+  const pm = new THREE.InstancedMesh(new THREE.BoxGeometry(0.4, 0.4, 0.03), M.fieldPanel, panels.length), dm = new THREE.Object3D(); pm.name = 'field_panels';
   panels.forEach(([x, y, an], k) => { dm.position.set(x, hAt(x, y) + F.footH + 0.55, -y); dm.rotation.set(0, an, 0); dm.updateMatrix(); pm.setMatrixAt(k, dm.matrix); });
   pm.castShadow = true; scene.add(pm);
   // brick wall with a concrete coping and pillars, broken by the gate
