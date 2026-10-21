@@ -14,7 +14,7 @@ import { bakeImpostor, makeImpostorMesh } from './impostor.js';
 import { BUILDERS, NVAR, materials } from './palms.js';
 import { VEG_U, patchVeg, tickVeg, vegDepth } from './wind.js';
 import { noiseAt } from './noise.js';
-import { FOREST_POLY, inForestPoly, inMandirClear, onUntracedRoad, quality } from './zones.js';
+import { FOREST_POLY, forestAmt, inForestPoly, inMandirClear, onUntracedRoad, quality } from './zones.js';
 import { SectorSet } from '../render/sectored.js';
 import { QUALITY } from '../render/quality.js';
 
@@ -76,7 +76,7 @@ function collectTrees() {
   for (let i = 0; i < 140000; i++) {
     const x = HG.x0 + r() * TW, y = HG.y0 + r() * TD, h = hAt(x, y), c = clsAt(x, y);
     if (c !== 0 && c !== 9) continue;
-    const onHill = h > 4, forest = onHill || inForestPoly(x, y), outside = c === 9;
+    const fa = forestAmt(x, y, h), forest = fa >= 1 || (fa > 0 && hash2(x * 1.7, y * 2.3) < fa), outside = c === 9; // a mixed edge over ~3 m of height, not a line
     const dm = forest ? 99 : distMain(x, y), road = dm < 20 && !outside;
     // groves and gardens cluster: a slow noise modulates density so trees gather instead of spreading evenly
     const grove = 0.35 + 1.3 * noiseAt(0, x / 140 + 0.2, y / 140 + 0.6);

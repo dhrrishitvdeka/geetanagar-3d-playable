@@ -10,7 +10,7 @@ import { PARK_BEDS } from '../world/streets.js';
 import { TD, TW } from '../world/terrain.js';
 import { bareNoise, noiseAt } from './noise.js';
 import { patchVeg } from './wind.js';
-import { inForestPoly, inMandirClear, onUntracedRoad, quality } from './zones.js';
+import { forestAmt, inMandirClear, onUntracedRoad, quality } from './zones.js';
 
 // ---------- near-camera grass: procedural clumps of curved blades, swaying in the wind ----------
 // Placement follows the same bare-earth noise as the terrain shader, so tufts grow on the green and not on the dust.
@@ -71,7 +71,7 @@ function updateGrass() {
     const x = (gx + hash2(gx, gy)) * step, y = (gy + hash2(gy, gx)) * step;
     const dist = Math.hypot(x - player.x, y - player.y); if (dist > R) continue;
     const c = clsAt(x, y); if (c !== 0 && c !== 4 && c !== 9) continue;
-    const h = hAt(x, y), forest = h > 4 || inForestPoly(x, y);
+    const h = hAt(x, y), fa = forestAmt(x, y, h), forest = fa >= 1 || (fa > 0 && hash2(x * 3.1, y * 1.9) < fa); // same fade as the ground paint
     let bare = forest ? 0.12 : BARE[c];
     // skip concrete aprons next to buildings
     if (c === 0 && !forest) { let nb = false; for (let a = 0; a < 4; a++) { const kk = clsAt(x + APRON[a][0], y + APRON[a][1]); if (kk === 2 || kk === 3) { nb = true; break; } } if (nb) continue; }

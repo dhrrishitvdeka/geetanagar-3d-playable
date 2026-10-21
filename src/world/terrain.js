@@ -5,7 +5,7 @@ import { cacheGet, cacheLater, texKey } from '../render/texcache.js';
 import ZONES_SRC from '../veg/zones.js?raw'; // source text of the forest polygon and untraced-road boxes, for the texture cache key
 import { ASSET } from '../veg/assets.js';
 import { GLSL_BARE, getNoiseTex } from '../veg/noise.js';
-import { inForestPoly, onUntracedRoad } from '../veg/zones.js';
+import { forestAmt, onUntracedRoad } from '../veg/zones.js';
 import { M } from './materials.js';
 import { QUALITY } from '../render/quality.js';
 
@@ -69,15 +69,18 @@ function paintGround() {
       const x = HG.x0 + (px + 0.5) / GPX;
       const c = clsAt(x, y), h = hAt(x, y);
       let col = PAL[c] || PAL[0], mk = MASK[c] || MASK[0], litter = mk[1], conc = mk[2], bare = mk[0];
-      const forest = (c === 0 || c === 9) && (h > 4 || inForestPoly(x, y));
-      if (forest) { col = FOREST_FLOOR; litter = 0.85; bare = 0.12; }
-      else if (onUntracedRoad(x, y)) bare = 1;
-      else if (c === 0) {
-        // concrete aprons and courtyards hugging buildings; dusty strips along lanes
-        let nb = 0, nr = 0;
-        for (const [dx, dy] of [[step, 0], [-step, 0], [0, step], [0, -step]]) { const k = clsAt(x + dx, y + dy); if (k === 2 || k === 3) nb++; else if (k === 1) nr++; }
-        if (nb) conc = Math.min(1, 0.35 + nb * 0.25) * (hash2(Math.floor(x / 9), Math.floor(y / 9)) < 0.55 ? 1 : 0.35);
-        if (nr) bare = Math.max(bare, 0.75);
+      const fa = (c === 0 || c === 9) ? forestAmt(x, y, h) : 0; // 0..1: the forest floor fades in over ~3 m of height instead of switching at h = 4
+      if (fa >= 1) { col = FOREST_FLOOR; litter = 0.85; bare = 0.12; }
+      else {
+        if (onUntracedRoad(x, y)) bare = 1;
+        else if (c === 0) {
+          // concrete aprons and courtyards hugging buildings; dusty strips along lanes
+          let nb = 0, nr = 0;
+          for (const [dx, dy] of [[step, 0], [-step, 0], [0, step], [0, -step]]) { const k = clsAt(x + dx, y + dy); if (k === 2 || k === 3) nb++; else if (k === 1) nr++; }
+          if (nb) conc = Math.min(1, 0.35 + nb * 0.25) * (hash2(Math.floor(x / 9), Math.floor(y / 9)) < 0.55 ? 1 : 0.35);
+          if (nr) bare = Math.max(bare, 0.75);
+        }
+        if (fa > 0) { col = [col[0] + (FOREST_FLOOR[0] - col[0]) * fa, col[1] + (FOREST_FLOOR[1] - col[1]) * fa, col[2] + (FOREST_FLOOR[2] - col[2]) * fa]; litter += (0.85 - litter) * fa; bare += (0.12 - bare) * fa; }
       }
       const n = hash2(Math.floor(x * 1.3), Math.floor(y * 1.3)) * 0.1 - 0.05 + (hash2(Math.floor(x / 7), Math.floor(y / 7)) - 0.5) * 0.12;
       const o = (py * W + px) * 4, m = 1 + n;
