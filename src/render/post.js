@@ -61,7 +61,7 @@ function build() {
       aoPass.blendIntensity = 0.85;
       composer.addPass(aoPass);
     }
-    if (Q.bloom) { bloomPass = new UnrealBloomPass(new THREE.Vector2(w, h), 0.05, 0.4, 2.5); composer.addPass(bloomPass); }
+    if (Q.bloom) { bloomPass = new UnrealBloomPass(new THREE.Vector2(w, h), 0.12, 0.35, 1.4); composer.addPass(bloomPass); }
     composer.addPass(new OutputPass());
   }
   ready = true;
