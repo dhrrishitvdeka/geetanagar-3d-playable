@@ -16,6 +16,7 @@ function applySun(hour) {
   sunDir.set(Math.sin(az) * Math.cos(e), Math.sin(e), -Math.cos(az) * Math.cos(e));
   const k = Math.min(1, Math.sin(e) * 1.6);
   sun.intensity = 0.8 + 2.6 * k; sun.color.copy(sunLow).lerp(sunHigh, k); hemi.intensity = 0.2 + 0.2 * k;
+  renderer.toneMappingExposure = 0.9 * Math.pow(3.4 / sun.intensity, 0.3); // noon 0.9, dawn ~1.4: the eye adapts, so dawn is dimmer but not murky
   scene.environmentIntensity = 0.18 + 0.17 * k;
   updateSky(k, sunDir);
 }
