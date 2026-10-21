@@ -96,8 +96,8 @@ function splitFootprint(b) {
 
 function buildAll() {
   const FM = facadeMaterials();
-  const W = { rcc: new MeshBuilder(), slide: new MeshBuilder(), assam: new MeshBuilder(), blank: new MeshBuilder(), side: new MeshBuilder() };
-  const trim = new MeshBuilder(), rail = new MeshBuilder(), roof = new MeshBuilder(), tin = new MeshBuilder();
+  // one set of mesh builders per 300 m cell, so the frustum and the shadow frustum can skip whole cells (150 m cut the shadow pass more but added ~290 draw calls)
+  const CB = 300, CELLB = new Map(), cellOf = (x, y) => { const k = Math.floor(x / CB) * 4096 + Math.floor(y / CB); return CELLB.get(k) || CELLB.set(k, { W: { rcc: new MeshBuilder(), slide: new MeshBuilder(), assam: new MeshBuilder(), blank: new MeshBuilder(), side: new MeshBuilder() }, trim: new MeshBuilder(), rail: new MeshBuilder(), roof: new MeshBuilder(), tin: new MeshBuilder() }).get(k); };
   const R = rng(2024);
   // a facade quad from z0 to z1 along edge a->b: u counts bays (0.5 texture units each), v counts floors
   const wall = (mb, a, b, n, z0, z1, col, top, uOff, vOff, gA, gB) => {
@@ -117,7 +117,7 @@ function buildAll() {
   const roofAt = (x, y, self) => { const l = NBG.get(nbk(Math.floor(x / NBC), Math.floor(y / NBC))); if (l) for (const bi of l) if (bi !== self && pointInPoly(x, y, MS[bi].pts)) return MS[bi].z1; return null; };
 
   LIST.forEach(({ b, bi }, li) => {
-    const m = MS[li]; if (!m) return; const { ov, raw, base, top, s, s2, s3, floors, a, lst, lowSight, vw, z0, z1, isTin, style, wallCol, trimCol, unfinished, pts } = m;
+    const m = MS[li]; if (!m) return; const { W, trim, rail, roof, tin } = cellOf(b.c[0], b.c[1]); const { ov, raw, base, top, s, s2, s3, floors, a, lst, lowSight, vw, z0, z1, isTin, style, wallCol, trimCol, unfinished, pts } = m;
     const n = pts.length;
 
     // ---- per-edge facts ----
@@ -282,8 +282,12 @@ function buildAll() {
     if (shopEdges.length) SHOPLIST.push({ pts, edges: shopEdges, sign: lst && lst.kind === 'bank' ? 'bank' : null, wall: wallCol, floors, top });
   });
   buildShopfronts(SHOPLIST);
-  for (const k in W) W[k].mesh(FM[k]);
-  trim.mesh(FM.trim); rail.mesh(FM.rail, { cast: true }); roof.mesh(FM.roof); tin.mesh(FM.tin);
+  let wv = 0, tv = 0, rv = 0;
+  for (const c of CELLB.values()) {
+    const o = { noMerge: true }; // mergeStatic would join the cells again and undo the culling
+    for (const k in c.W) { c.W[k].mesh(FM[k], o); wv += c.W[k].verts; }
+    c.trim.mesh(FM.trim, o); c.rail.mesh(FM.rail, { cast: true, noMerge: true }); c.roof.mesh(FM.roof, o); c.tin.mesh(FM.tin, o); tv += c.trim.verts; rv += c.rail.verts;
+  }
   // tanks: black plastic with a ribbed body and a lid, on a short stand
   const tg = new THREE.CylinderGeometry(0.72, 0.78, 1.3, 14); tg.translate(0, 0.65 + 0.9, 0);
   const tm = new THREE.InstancedMesh(tg, new THREE.MeshStandardMaterial({ color: '#202326', roughness: 0.55 }), tanks.reduce((s, t) => s + t.n, 0));
@@ -294,7 +298,7 @@ function buildAll() {
   const sm = new THREE.InstancedMesh(stand, new THREE.MeshStandardMaterial({ color: '#8f8b83', roughness: 0.9 }), tanks.length); ti = 0;
   for (const t of tanks) { dm.position.set(t.x + (t.n - 1) * 0.9, t.z, -t.y); dm.scale.set(t.n > 1 ? 2.1 : 1, 1, 1); dm.updateMatrix(); sm.setMatrixAt(ti++, dm.matrix); dm.scale.set(1, 1, 1); }
   sm.castShadow = sm.receiveShadow = true; scene.add(sm);
-  if (import.meta.env.DEV) console.info(`[buildings] ${BLD.length} buildings, facade textures ${FM.ms.toFixed(0)} ms, verts: walls ${Object.values(W).reduce((s, m) => s + m.verts, 0)}, trim ${trim.verts}, rail ${rail.verts}`);
+  if (import.meta.env.DEV) console.info(`[buildings] ${BLD.length} buildings, facade textures ${FM.ms.toFixed(0)} ms, cells ${CELLB.size}, verts: walls ${wv}, trim ${tv}, rail ${rv}`);
 }
 
 export { buildAll, WALLS, SHOP_WALLS, TIN, SLAB, tanks, BLD, SHOPLIST, ROOFS };
