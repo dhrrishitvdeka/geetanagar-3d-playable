@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { renderer } from '../core/context.js';
 import { patchVeg } from './wind.js';
+import { QUALITY } from '../render/quality.js';
 
 // ---------- tree impostors: each EZ-Tree model is rendered once at load into an atlas of views ----------
 // AZ azimuths x EL elevations; each cell holds albedo (with crown-depth darkening) and a model-space normal.
@@ -121,7 +122,7 @@ vec4 impSample(sampler2D t, vec2 q) {
 
 function makeImpostorMesh(bake, count, opts = {}) {
   const geo = new THREE.PlaneGeometry(1, 1);
-  const mat = new THREE.MeshStandardMaterial({ map: bake.albedo, alphaTest: 0.42, roughness: 0.92, side: THREE.DoubleSide });
+  const mat = new THREE.MeshStandardMaterial({ map: bake.albedo, alphaTest: 0.42, alphaToCoverage: QUALITY !== 'low', roughness: 0.92, side: THREE.DoubleSide });
   const uniforms = { uImpS: { value: bake.S }, uImpCy: { value: bake.cy }, uImpAlb: { value: bake.albedo }, uImpNrm: { value: bake.normal } };
   const patch = (sh, depth) => {
     Object.assign(sh.uniforms, uniforms);

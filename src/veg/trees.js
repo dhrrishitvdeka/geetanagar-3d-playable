@@ -15,6 +15,7 @@ import { VEG_U, patchVeg, tickVeg, vegDepth } from './wind.js';
 import { noiseAt } from './noise.js';
 import { FOREST_POLY, inForestPoly, inMandirClear, onUntracedRoad, quality } from './zones.js';
 import { SectorSet } from '../render/sectored.js';
+import { QUALITY } from '../render/quality.js';
 
 // ---------- trees ----------
 // Broadleaf trees (EZ-Tree models standing in for rain tree, mango, jackfruit and the pink-flowering median trees):
@@ -132,7 +133,7 @@ function buildTreeMeshes() {
       nearSets[v] = mp.parts.map(p => {
         const leaf = isLeaf(p);
         const mat = leaf
-          ? patchVeg(new THREE.MeshStandardMaterial({ map: leafTex[v], alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.78 }), { ...wind, flutter: 0.05, foliage: { center, radius, mix: 0.65, ao: 0.45 }, upNormals: true })
+          ? patchVeg(new THREE.MeshStandardMaterial({ map: leafTex[v], alphaTest: 0.5, alphaToCoverage: QUALITY !== 'low', side: THREE.DoubleSide, roughness: 0.78 }), { ...wind, flutter: 0.05, foliage: { center, radius, mix: 0.65, ao: 0.45 }, upNormals: true })
           : patchVeg(new THREE.MeshStandardMaterial({ map: ASSET.bark, normalMap: ASSET.barkN, color: bark, roughness: 0.95 }), wind);
         // sliced round the camera so the slices out of view are culled (leaf slices carry the per-tree tint)
         const im = new SectorSet(p.geo, mat, Math.max(...Object.values(QP).map(q => q.cap)), { colors: leaf }); im.castShadow = true; im.receiveShadow = true;

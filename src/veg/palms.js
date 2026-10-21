@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { renderer } from '../core/context.js';
 import { rng } from '../core/geo.js';
 import { patchVeg, vegDepth } from './wind.js';
+import { QUALITY } from '../render/quality.js';
 
 // ---------- procedural yard plants of Guwahati: areca (tamul) and coconut palms, banana, bamboo clumps ----------
 // Built in metres at load: curved tube trunks, arching pinnate fronds as folded alpha strips, banana leaves,
@@ -249,7 +250,7 @@ function materials() {
   if (MATS.ready) return MATS;
   const t = textures();
   const trunk = map => patchVeg(new THREE.MeshStandardMaterial({ map, vertexColors: true, roughness: 0.92 }), { attr: true });
-  const leaf = (map, rough = 0.8) => patchVeg(new THREE.MeshStandardMaterial({ map, vertexColors: true, alphaTest: 0.45, side: THREE.DoubleSide, roughness: rough }), { attr: true, flutter: 1, upNormals: true });
+  const leaf = (map, rough = 0.8) => patchVeg(new THREE.MeshStandardMaterial({ map, vertexColors: true, alphaTest: 0.45, alphaToCoverage: QUALITY !== 'low', side: THREE.DoubleSide, roughness: rough }), { attr: true, flutter: 1, upNormals: true });
   const depth = map => vegDepth(map, { attr: true, flutter: 1 }, 0.45);
   MATS.areca = { trunk: trunk(t.arecaTrunk), leaf: leaf(t.areca), depth: depth(t.areca) };
   MATS.coconut = { trunk: trunk(t.cocoTrunk), leaf: leaf(t.coco), depth: depth(t.coco) };
