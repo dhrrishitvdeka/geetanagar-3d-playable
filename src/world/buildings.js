@@ -63,6 +63,37 @@ function massing(b, bi) {
   return { ov, raw, base, top, s, s2, s3, floors, a, lst, lowSight, vw, z0, z1, isTin, style, wallCol, trimCol, unfinished, pts: simplifyRing(raw, 0.85) };
 }
 
+// keep the part of a ring where sign * ((p - m) . u - t) >= 0 (Sutherland-Hodgman against one line)
+function clipHalf(ring, mx, my, ux, uy, t, sign) {
+  if (!isFinite(t)) return ring;
+  const f = p => sign * ((p[0] - mx) * ux + (p[1] - my) * uy - t), out = [];
+  for (let i = 0; i < ring.length; i++) { const A = ring[i], B = ring[(i + 1) % ring.length], fa = f(A), fb = f(B);
+    if (fa >= 0) out.push(A);
+    if ((fa >= 0) !== (fb >= 0)) { const k = fa / (fa - fb); out.push([A[0] + (B[0] - A[0]) * k, A[1] + (B[1] - A[1]) * k]); } }
+  return out;
+}
+const ringArea = r => { let s = 0; for (let i = 0; i < r.length; i++) { const a = r[i], b = r[(i + 1) % r.length]; s += a[0] * b[1] - b[0] * a[1]; } return Math.abs(s) / 2; };
+// very large traced blobs are usually a row of joined houses: cut them across their long axis into 9-14 m plots
+function splitFootprint(b) {
+  const P = b.p, n = P.length; if (b.a < 380 || n < 3) return [b];
+  let mx = 0, my = 0; for (const p of P) { mx += p[0]; my += p[1]; } mx /= n; my /= n;
+  let sxx = 0, syy = 0, sxy = 0; for (const p of P) { const dx = p[0] - mx, dy = p[1] - my; sxx += dx * dx; syy += dy * dy; sxy += dx * dy; }
+  const ang = 0.5 * Math.atan2(2 * sxy, sxx - syy), ux = Math.cos(ang), uy = Math.sin(ang); // principal (long) axis
+  let t0 = Infinity, t1 = -Infinity, w0 = Infinity, w1 = -Infinity;
+  for (const p of P) { const t = (p[0] - mx) * ux + (p[1] - my) * uy, w = -(p[0] - mx) * uy + (p[1] - my) * ux; t0 = Math.min(t0, t); t1 = Math.max(t1, t); w0 = Math.min(w0, w); w1 = Math.max(w1, w); }
+  const L = t1 - t0; if (L / Math.max(1, w1 - w0) < 1.5 && b.a < 900) return [b];
+  const k = Math.min(6, Math.max(2, Math.round(L / (9 + hash2(mx, my) * 5))));
+  const cut = j => j <= 0 ? -Infinity : j >= k ? Infinity : t0 + L * (j + (hash2(j * 3.1, mx + my) - 0.5) * 0.3) / k;
+  const out = [];
+  for (let j = 0; j < k; j++) {
+    const ring = clipHalf(clipHalf(P, mx, my, ux, uy, cut(j), 1), mx, my, ux, uy, cut(j + 1), -1);
+    const ar = ring.length >= 3 ? ringArea(ring) : 0; if (ar < 20) continue;
+    let cx = 0, cy = 0; for (const p of ring) { cx += p[0]; cy += p[1]; }
+    out.push({ ...b, p: ring, a: ar, c: [cx / ring.length, cy / ring.length] });
+  }
+  return out.length > 1 ? out : [b];
+}
+
 function buildAll() {
   const FM = facadeMaterials();
   const W = { rcc: new MeshBuilder(), slide: new MeshBuilder(), assam: new MeshBuilder(), blank: new MeshBuilder(), side: new MeshBuilder() };
@@ -77,15 +108,16 @@ function buildAll() {
   };
 
   // pass 1: every building's roof height, so a side wall knows how much of it the neighbour hides
-  const MS = GEO.buildings.map((b, bi) => massing(b, bi));
+  const LIST = []; GEO.buildings.forEach((b, bi) => { if (OVERRIDES[bi] || LANDMARK_STYLE.get(b)) LIST.push({ b, bi }); else for (const p of splitFootprint(b)) LIST.push({ b: p, bi }); });
+  const MS = LIST.map(({ b, bi }) => massing(b, bi)); // massing still reads OVERRIDES[bi]
   const NBG = new Map(), NBC = 16, nbk = (i, j) => i * 65536 + j;
-  MS.forEach((m, bi) => { if (!m) return; let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  MS.forEach((m, li) => { if (!m) return; let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
     for (const p of m.pts) { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); }
-    for (let i = Math.floor(x0 / NBC); i <= Math.floor(x1 / NBC); i++) for (let j = Math.floor(y0 / NBC); j <= Math.floor(y1 / NBC); j++) { const k = nbk(i, j); (NBG.get(k) || NBG.set(k, []).get(k)).push(bi); } });
+    for (let i = Math.floor(x0 / NBC); i <= Math.floor(x1 / NBC); i++) for (let j = Math.floor(y0 / NBC); j <= Math.floor(y1 / NBC); j++) { const k = nbk(i, j); (NBG.get(k) || NBG.set(k, []).get(k)).push(li); } });
   const roofAt = (x, y, self) => { const l = NBG.get(nbk(Math.floor(x / NBC), Math.floor(y / NBC))); if (l) for (const bi of l) if (bi !== self && pointInPoly(x, y, MS[bi].pts)) return MS[bi].z1; return null; };
 
-  GEO.buildings.forEach((b, bi) => {
-    const m = MS[bi]; if (!m) return; const { ov, raw, base, top, s, s2, s3, floors, a, lst, lowSight, vw, z0, z1, isTin, style, wallCol, trimCol, unfinished, pts } = m;
+  LIST.forEach(({ b, bi }, li) => {
+    const m = MS[li]; if (!m) return; const { ov, raw, base, top, s, s2, s3, floors, a, lst, lowSight, vw, z0, z1, isTin, style, wallCol, trimCol, unfinished, pts } = m;
     const n = pts.length;
 
     // ---- per-edge facts ----
@@ -106,7 +138,7 @@ function buildAll() {
       const e = E[i], mx = (e.p[0] + e.q[0]) / 2, my = (e.p[1] + e.q[1]) / 2, nb = d => { const k = clsAt(mx + e.n[0] * d, my + e.n[1] * d); return k === 2 || k === 3; };
       const party = !e.road && nb(3.0) && nb(4.2);
       // a neighbour hides this wall only up to its own roof; above that the wall is exposed and gets windows like any other
-      let hid = party ? roofAt(mx + e.n[0] * 3.6, my + e.n[1] * 3.6, bi) : null; if (party && hid === null) hid = z1;
+      let hid = party ? roofAt(mx + e.n[0] * 3.6, my + e.n[1] * 3.6, li) : null; if (party && hid === null) hid = z1;
       e.hid = hid === null ? -Infinity : Math.min(z1, hid + 0.3);
       e.front = e.road || i === longest;
       e.win = style !== 'blank' && e.L >= (style === 'assam' ? 2.0 : 2.2) && z1 - Math.max(e.hid, top) >= 2.4;
@@ -200,7 +232,7 @@ function buildAll() {
       if (!unfinished) { // parapet with a concrete coping
         const ph = 0.95;
         for (let i = 0; i < n; i++) {
-          const e = E[i];
+          const e = E[i]; if (e.hid >= z1) continue; // a taller neighbour (often a cut piece of the same blob) already stands in this plane
           wall(W.blank, e.p, e.q, e.n, z1, z1 + ph, wallCol.clone().multiplyScalar(0.96), top, 0, 0, z1 - 20, z1 - 20);
           trim.box(e.p, e.u, e.n, -0.03, e.L + 0.03, -0.18, 0.04, z1 + ph, z1 + ph + 0.07, trimCol, 'ft', -1e3);
         }
