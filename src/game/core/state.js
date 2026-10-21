@@ -9,7 +9,7 @@ const DEFAULT_SETTINGS = { sens: 1, volume: 0.8, invertY: false, fov: 70 };
 const fresh = () => ({
   money: 50, inv: {}, quests: {}, flags: {}, collected: [], discovered: [],
   stats: { distance: 0, goals: 0, deliveries: 0, photos: 0, talks: 0 },
-  time: 7.0, day: 1, player: null, look: null,
+  time: 7.0, day: 1, player: null, look: null, wear: null, // wear: the outfit put on over the look ({ id, ...appearance }), see items.js
 });
 function loadSettings() {
   try { return { ...DEFAULT_SETTINGS, ...JSON.parse(localStorage.getItem(SKEY) || '{}') }; } catch (e) { return { ...DEFAULT_SETTINGS }; }

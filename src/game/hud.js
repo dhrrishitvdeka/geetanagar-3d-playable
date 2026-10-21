@@ -8,7 +8,7 @@ import * as input from './input.js'; // namespace import: resetPresses only exis
 import { clockText, hasSave, save, saveSettings, state } from './core/state.js';
 import { getPlayer } from './player.js';
 import { getQuestLog } from './quests.js';
-import { ITEMS, useItem } from './items.js';
+import { ITEMS, isWorn, useItem } from './items.js';
 import { isFullMapOpen } from './map.js';
 import { setVolume, sfx } from './audio.js';
 import { getDelivery } from './worldobjects.js';
@@ -563,11 +563,16 @@ const LOOKS = [
   { id: 'leaf', name: 'Leaf', skin: '#a8704a', top: '#4f6b45', gamosa: false },
   { id: 'ink', name: 'Ink', skin: '#6b4228', top: '#2f3a4a', gamosa: true },
   { id: 'lotus', name: 'Lotus', skin: '#f0c8a0', top: '#d96b8e', gamosa: false },
+  // in a mekhela sador: muga gold with maroon, and ivory pat silk with green
+  { id: 'muga', name: 'Muga', skin: '#b98058', top: '#8e1f2f', gamosa: false, mek: '#d6b25e', wear: { female: true, hairStyle: 'bun', topStyle: 'blouse', bottomStyle: 'mekhela', bottom: '#d6b25e', wrap: '#e2c57a', motif: '#a01e2c', bag: null } },
+  { id: 'pat', name: 'Pat', skin: '#d9a37a', top: '#1f6a45', gamosa: false, mek: '#efe7d2', wear: { female: true, hairStyle: 'long', topStyle: 'blouse', bottomStyle: 'mekhela', bottom: '#efe7d2', wrap: '#f2ebd8', motif: '#b3202e', bag: null } },
 ];
+// what a look without its own `wear` resets, so going back from a mekhela look gives the usual t-shirt and jeans
+const PLAIN = { female: false, hairStyle: 'short', topStyle: 'tshirt', bottomStyle: 'pants', bottom: '#2c3e50', wrap: null, motif: null };
 let pickedLook = null; const placeNames = {};
 const lookIndex = () => { const l = pickedLook || state.look; return l ? LOOKS.findIndex(x => x.skin === l.skin && x.top === l.top && !!x.gamosa === !!l.gamosa) : -1; };
 function pickLook(i) {
-  const L = LOOKS[i]; pickedLook = { skin: L.skin, top: L.top, gamosa: L.gamosa };
+  const L = LOOKS[i]; pickedLook = { skin: L.skin, top: L.top, gamosa: L.gamosa, ...(L.wear || PLAIN) };
   state.look = { ...(state.look || {}), ...pickedLook }; emit('ui:look', { look: state.look });
 }
 
@@ -650,7 +655,8 @@ function renderTitle(card) {
     const b = el('button', 'g-look' + (i === cur ? ' on' : '')); b.type = 'button'; b.dataset.fid = 'look' + i;
     b.setAttribute('role', 'radio'); b.setAttribute('aria-checked', String(i === cur)); b.setAttribute('aria-label', L.name + (L.gamosa ? ', with gamosa' : ''));
     b.style.setProperty('--skin', L.skin); b.style.setProperty('--shirt', L.top);
-    const fig = el('span', 'lk'); put(fig, el('i', 'lk-head'), el('i', 'lk-body'), L.gamosa ? el('i', 'lk-gam') : null);
+    if (L.mek) b.style.setProperty('--mek', L.mek);
+    const fig = el('span', 'lk'); put(fig, el('i', 'lk-head'), el('i', 'lk-body'), L.gamosa ? el('i', 'lk-gam') : null, L.mek ? el('i', 'lk-mek') : null);
     put(b, fig, el('span', 'lk-name', L.name));
     b.addEventListener('click', () => { click(); pickLook(i); renderMenu(); });
     grid.appendChild(b);
@@ -748,7 +754,7 @@ function renderInventory(card) {
     const it = ITEMS[id] || {}, li = el('li', 'g-invrow'), info = el('div', 'g-sinfo');
     put(info, el('b', null, it.name || pretty(id)), it.desc ? el('span', 'g-sdesc', it.desc) : null);
     put(li, info, el('span', 'g-qty', '×' + state.inv[id]));
-    if (it.use) { const u = button('Use', '', () => { try { useItem(id); } catch (e) { console.error('[hud] useItem failed', e); } renderMenu(); }); u.dataset.fid = 'use-' + id; li.appendChild(u); }
+    if (it.use || it.wear) { const u = button(it.wear ? (isWorn(id) ? 'Take off' : 'Wear') : 'Use', '', () => { try { useItem(id); } catch (e) { console.error('[hud] useItem failed', e); } renderMenu(); }); u.dataset.fid = 'use-' + id; li.appendChild(u); }
     list.appendChild(li);
   }
   const wallet = el('p', 'g-note', 'Cash: ' + rupee(state.money));

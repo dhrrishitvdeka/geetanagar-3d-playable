@@ -51,7 +51,7 @@ const mulberry = seed => () => { seed = (seed + 0x6d2b79f5) | 0; let t = Math.im
 // ---------- character model ----------
 function buildLook() {
   // a young local in a white gamosa over a t-shirt and jeans, unless the title screen picked something else
-  const a = { ...randomAppearance(mulberry(2026), { female: false }), female: false, hairStyle: 'short', gamosa: true, topStyle: 'tshirt', bottomStyle: 'pants', wrap: null, hat: null, umbrella: null, ...state.look };
+  const a = { ...randomAppearance(mulberry(2026), { female: false }), female: false, hairStyle: 'short', gamosa: true, topStyle: 'tshirt', bottomStyle: 'pants', wrap: null, hat: null, umbrella: null, ...state.look, ...(state.wear || {}) }; // an outfit (items.js) goes over the look
   const next = makeCharacter(a);
   if (group) scene.remove(group);
   ch = next; group = ch.group; group.userData.noMerge = true; scale = a.height || 1;

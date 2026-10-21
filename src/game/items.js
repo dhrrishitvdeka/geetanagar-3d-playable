@@ -2,7 +2,7 @@ import { emit } from './core/bus.js';
 import { addItem, hasItem, removeItem, spend, state } from './core/state.js';
 import { sfx } from './audio.js';
 import { showShop, toast } from './hud.js';
-import { addBuff } from './player.js';
+import { addBuff, setLook } from './player.js';
 
 // ---------- items: what they cost, what they do ----------
 const fill = () => { state.stamina = 1; };
@@ -34,6 +34,9 @@ const ITEMS = {
   newspaper: { name: 'Newspaper', price: 5, desc: 'Today\'s paper. Light local reading.', use() { return `Headline: ${pickLine(HEADLINES)}`; }, ms: 6500 },
   thali: { name: 'Fish thali', price: 60, desc: 'Rice, dal, aloo pitika and masor tenga, the sour fish curry. Full stamina, and you tire slowly for a long while.', use() { fill(); addBuff('stamina', 240); return 'Masor tenga, rice and a squeeze of lemon. You could walk to Hatigarh and back.'; } },
   cake: { name: 'Cake slice', price: 25, desc: 'A soft slice of sponge cake with cream on top.', use() { eat(0.35); return 'Cream on your nose. Worth it.'; } },
+  // outfits: worn, not used up. `wear` is laid over your look (player.js); New Assam Dresses sells them
+  mekhela_muga: { name: 'Muga mekhela sador', price: 180, desc: 'Golden muga silk woven with red motifs at the border, with a matching sador and a maroon blouse. Made for Bihu.',
+    wear: { female: true, hairStyle: 'bun', topStyle: 'blouse', top: '#8e1f2f', bottomStyle: 'mekhela', bottom: '#d6b25e', wrap: '#e2c57a', motif: '#a01e2c', gamosa: false, hat: null, bag: null, umbrella: null, phone: false, stick: null } },
   mekhela_pat: { name: 'Pat mekhela sador', price: 150, desc: 'Ivory pat silk with green and red woven borders, and a green blouse.',
     wear: { female: true, hairStyle: 'bun', topStyle: 'blouse', top: '#1f6a45', bottomStyle: 'mekhela', bottom: '#efe7d2', wrap: '#f2ebd8', motif: '#b3202e', gamosa: false, hat: null, bag: null, umbrella: null, phone: false, stick: null } },
   dhoti_kurta: { name: 'Dhoti, kurta and japi', price: 120, desc: 'A cream kurta, a white dhoti, a gamosa round the neck and a japi hat. Bihu dress for the dhol players.',
@@ -53,6 +56,7 @@ const SHOPS = {
   hatigarh_kiosk: { name: 'Hatigarh Kiosk', owner: 'the kiosk owner', items: ['biscuits', 'water', 'newspaper'] },
   sweets: { name: 'Hatigarh Sweet Stall', owner: 'the sweet seller', items: ['jalebi', 'pitha'] },
   // the shopfronts on Mother Teresa Rd (content/shopkeepers.js): one table per kind of shop, the keeper's name comes with the visit
+  dresses: { name: 'New Assam Dresses', owner: 'the shopkeeper', items: ['mekhela_muga', 'mekhela_pat', 'dhoti_kurta'] },
   sweet_shop: { name: 'Sharma Sweets', owner: 'the shopkeeper', items: ['pitha', 'jalebi', 'samosa'] },
   tea_shop: { name: 'Assam Tea Stall', owner: 'the shopkeeper', items: ['lal_sah', 'doodh_sah', 'samosa'] },
   grocery: { name: 'General Store', owner: 'the shopkeeper', items: ['biscuits', 'water', 'banana'] },
@@ -61,6 +65,7 @@ const SHOPS = {
   bakery: { name: 'Bakery & Cakes', owner: 'the shopkeeper', items: ['cake', 'biscuits'] },
   hotel: { name: 'Hotel', owner: 'the cook', items: ['thali', 'lal_sah'] },
 };
+const isWorn = id => !!state.wear && state.wear.id === id;
 
 // resolves when the shop closes; a forced close (pause, day change) resolves it with null and changes nothing
 // owner / title: the person and the signboard, for the shop tables that several keepers share (the shopfronts)
@@ -76,8 +81,18 @@ async function openShop(shopId, owner, title) {
   try { await showShop({ title: title || shop.name, subtitle: `Run by ${owner || shop.owner}`, items, onBuy }); } catch (err) { console.error('[shop]', err); }
 }
 
+// put an outfit on, or take it off again (back to your own look); it stays in the bag either way
+function wearItem(id) {
+  const it = ITEMS[id]; if (!it || !it.wear || !hasItem(id)) return false;
+  const off = isWorn(id);
+  state.wear = off ? null : { id, ...it.wear }; setLook(state.look);
+  emit('outfit:changed', { id: off ? null : id }); sfx('pickup', { vol: 0.5 });
+  toast(off ? `You take off the ${it.name.toLowerCase()}.` : `You put on the ${it.name.toLowerCase()}.`, { kind: 'good' });
+  return true;
+}
 function useItem(id) {
   const it = ITEMS[id]; if (!it) return false;
+  if (it.wear) return wearItem(id);
   if (!it.use) { if (it.hint) toast(it.hint, { kind: 'info' }); return false; }
   if (!hasItem(id)) return false;
   removeItem(id, 1);
@@ -87,4 +102,4 @@ function useItem(id) {
   return true;
 }
 
-export { ITEMS, SHOPS, openShop, useItem };
+export { ITEMS, SHOPS, openShop, useItem, wearItem, isWorn };

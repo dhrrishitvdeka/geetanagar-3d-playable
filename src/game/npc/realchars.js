@@ -293,16 +293,30 @@ function torsoInfl(t, y) { // weights along the spine for something wrapped roun
 }
 // a flared garment hanging from the waist, following both thighs a little so it does not stay rigid when sitting or striding.
 // o.grow is how far it stands off the body (the painted garments are puffed ~2.5 cm, so layers go outward from there).
+// o.motif (a colour) makes it a woven mekhela: finer grid, a motif border above the hem, small butas over the body and the
+// pleats tucked in at the front (real ripples plus a shade on every other fold).
 function addSkirt(acc, t, o) {
-  const S = 12, R = 6, b = t.bi, gr = o.grow || 0.03; t.sec(o.top, SEC);
+  const S = o.motif ? 32 : 12, R = o.motif ? 16 : 6, b = t.bi, gr = o.grow || 0.03; t.sec(o.top, SEC);
   const ax0 = SEC.rx + gr, az0 = (SEC.zf - SEC.zb) / 2 + gr, cz = (SEC.zf + SEC.zb) / 2;
+  const front = a => smooth(0.78, 0.92, Math.cos(a)); // the pleated panel: about 40 degrees either side of the front
   const g = grid((u, v) => {
     const y = o.top + (o.hem - o.top) * v; t.sec(Math.max(y, SY0), SEC); const fl = o.flare * Math.pow(v, 0.7), a = u * Math.PI * 2, mn = o.room && v > 0.08 ? o.room * smooth(0.08, 0.35, v) : 0; // room: a minimum radius for loose skirts so the thighs have space
     const back = mn ? 0.06 * smooth(0.12, 0.7, v) : 0; // legs swing back further than forward, so a loose skirt hangs a little behind
-    return [Math.sin(a) * Math.max(ax0 + fl, SEC.rx + gr + 0.01, mn * 1.08), y, cz - back + Math.cos(a) * (Math.max(az0 + fl, (SEC.zf - SEC.zb) / 2 + gr + 0.01, mn) + back)];
+    const pleat = o.motif && Math.round(u * S) % 2 ? 0.016 * front(a) * smooth(0.04, 0.22, v) : 0;
+    return [Math.sin(a) * (Math.max(ax0 + fl, SEC.rx + gr + 0.01, mn * 1.08) + pleat), y, cz - back + Math.cos(a) * (Math.max(az0 + fl, (SEC.zf - SEC.zb) / 2 + gr + 0.01, mn) + back + pleat)];
   }, S, R, true);
-  const span = o.top - o.hem || 1;
-  acc.geo(g, (i, x, y) => { const v = (o.top - y) / span; return v < 0.07 ? mul(o.col, 0.78) : v > 0.93 ? [o.col[0] * o.rim[0], o.col[1] * o.rim[1], o.col[2] * o.rim[2]] : o.col; },
+  const span = o.top - o.hem || 1, rimC = [o.col[0] * o.rim[0], o.col[1] * o.rim[1], o.col[2] * o.rim[2]];
+  const plain = (i, x, y) => { const v = (o.top - y) / span; return v < 0.07 ? mul(o.col, 0.78) : v > 0.93 ? rimC : o.col; };
+  const woven = i => { // grid vertex i = row * S + column (closed grid)
+    const c = i % S, r = Math.floor(i / S), M = o.motif;
+    if (r === 0) return mul(o.col, 0.78);                                                     // waist band
+    if (r >= R - 1) return M;                                                                 // woven hem
+    if (r === R - 4 || r === R - 2) return M;                                                 // border lines
+    if (r === R - 3) return c % 3 === 0 ? M : c % 3 === 1 ? rimC : o.col;                     // kingkhap-like run between them
+    if (r % 3 === 1 && r < R - 5 && c % 4 === (r % 2 ? 0 : 2)) return mul(M, 0.92);            // butas
+    return c % 2 && Math.cos(c / S * Math.PI * 2) > 0.8 && r < R - 4 ? mul(o.col, 0.86) : o.col; // shade every other front pleat
+  };
+  acc.geo(g, o.motif ? woven : plain,
     (i, x, y) => { // pelvis, both thighs (so the middle of the front and back follows their average) and, low down, the calf on the vertex's own side
       const v = (o.top - y) / span, wt = o.thigh * smooth(0.1, 0.9, v), s = smooth(-0.06, 0.06, x), sd = 2 * s - 1, wc = (o.calf || 0) * smooth(0.45, 1, v) * Math.abs(sd);
       return [[b.pelvis, 1 - wt - wc], [b.thigh_l, wt * s], [b.thigh_r, wt * (1 - s)], [sd >= 0 ? b.calf_l : b.calf_r, wc]];
@@ -314,13 +328,22 @@ function ringAt(t, y, a, grow) {
   t.sec(y, SEC); const rx = Math.max(SEC.rx, y > t.clavY - 0.14 ? SEC.rs * 0.95 : 0) + grow, zf = SEC.zf + grow, zb = -SEC.zb + grow, c = Math.cos(a);
   return [Math.sin(a) * rx, y, c >= 0 ? zf * c : zb * c];
 }
-// chador / sari drape: a wide sash from the left shoulder across the chest to the right hip, and a panel down the back, both with a darker border
-function addWrap(acc, t, col) {
-  const yS = t.clavY + 0.03, yH = t.pelvisY + 0.02, yB = t.pelvisY - 0.2, dark = mul(col, 0.62);
-  const sash = grid((u, v) => ringAt(t, yS - (yS - yH) * u + (v - 0.5) * 0.22, 1.2 - 2.4 * u, GROW), 16, 3, false);
-  acc.geo(sash, (i, x, y) => { const v = Math.floor(i / 17) / 3; return v < 0.2 || v > 0.8 ? dark : col; }, (i, x, y) => torsoInfl(t, y));
-  const cape = grid((u, v) => ringAt(t, yS + 0.02 - (yS - yB) * v, Math.PI + (u - 0.5) * 2.6, GROW), 12, 10, false);
-  acc.geo(cape, (i, x, y) => (Math.floor(i / 13) >= 9 ? dark : col), (i, x, y) => torsoInfl(t, y));
+// chador / sari drape: a wide sash from the left shoulder across the chest to the right hip, and a panel down the back, both with a darker
+// border. With a motif colour (a mekhela's chador) the borders are woven in that colour and the back panel carries butas.
+function addWrap(acc, t, col, motif) {
+  const yS = t.clavY + 0.03, yH = t.pelvisY + 0.02, yB = t.pelvisY - 0.2, edge = motif || mul(col, 0.62);
+  const SC = motif ? 24 : 16, SR = motif ? 5 : 3, CC = motif ? 16 : 12, CR = motif ? 14 : 10;
+  const sash = grid((u, v) => ringAt(t, yS - (yS - yH) * u + (v - 0.5) * 0.22, 1.2 - 2.4 * u, GROW), SC, SR, false);
+  acc.geo(sash, (i) => { const r = Math.floor(i / (SC + 1)), c = i % (SC + 1), v = r / SR; if (v < 0.2 || v > 0.8) return edge; return motif && r === 2 && c % 3 === 1 ? mul(motif, 0.95) : col; }, (i, x, y) => torsoInfl(t, y));
+  const cape = grid((u, v) => ringAt(t, yS + 0.02 - (yS - yB) * v, Math.PI + (u - 0.5) * 2.6, GROW), CC, CR, false);
+  acc.geo(cape, (i) => {
+    const r = Math.floor(i / (CC + 1)), c = i % (CC + 1);
+    if (r >= CR - 1) return edge;
+    if (!motif) return col;
+    if (r === CR - 3) return edge;                                       // border line above the woven end
+    if (r === CR - 2) return c % 2 ? mul(motif, 0.85) : col;            // the end panel's motif run
+    return r % 3 === 1 && c % 3 === (r % 2 ? 0 : 2) && r < CR - 4 ? motif : col; // butas
+  }, (i, x, y) => torsoInfl(t, y));
 }
 // gamosa: a band round the back of the neck and over the shoulders, then a strip hanging down each side of the chest to about the waist
 // (white cotton, red woven border at the ends and along the edges), standing a little off the body
@@ -349,13 +372,14 @@ function addHat(acc, t, kind, tint) {
 function buildDress(t, a) {
   const acc = new Acc(), b = t.bi, H = t.H, k = H / 1.65, ts = a.topStyle, bs = a.bottomStyle, rim = [1, 0.86, 0.58], kid = !!a.kid;
   const waist = t.pelvisY + 0.07, bot = rgb(a.bottom), top = rgb(a.top);
-  if (bs === 'mekhela' || bs === 'sari') addSkirt(acc, t, { top: waist, hem: H * 0.06, flare: 0.24, col: bot, rim, thigh: 0.6, calf: 0.35, room: 0.26 * t.H / 1.81 });
+  const motif = bs === 'mekhela' ? rgb(a.motif || a.top) : null; // the woven motifs; a mekhela's blouse is usually cut to match them
+  if (bs === 'mekhela' || bs === 'sari') addSkirt(acc, t, { top: waist, hem: H * 0.06, flare: 0.24, col: bot, rim, thigh: 0.6, calf: 0.35, room: 0.26 * t.H / 1.81, motif });
   else if (bs === 'skirt') addSkirt(acc, t, { top: waist, hem: H * (kid ? 0.35 : 0.3), flare: 0.12, col: bot, rim: [1, 1, 1], thigh: 0.4 });
   else if (bs === 'dhoti') addSkirt(acc, t, { top: waist, hem: H * 0.15, flare: 0.1, col: bot, rim: [1, 1, 1], thigh: 0.4, calf: 0.25, room: 0.22 * t.H / 1.81 });
   if (ts === 'kurta') addSkirt(acc, t, { top: waist + 0.05, hem: H * 0.31, flare: 0.08, col: top, rim: [1, 1, 1], thigh: 0.35, grow: 0.05 });
   else if (ts === 'robe') addSkirt(acc, t, { top: waist + 0.05, hem: H * 0.28, flare: 0.13, col: top, rim: [1, 1, 1], thigh: 0.4, grow: 0.05 });
   else if (ts === 'blouse') addSkirt(acc, t, { top: waist + 0.06, hem: t.pelvisY - 0.06, flare: 0.04, col: top, rim: [1, 1, 1], thigh: 0.1, grow: 0.045 });
-  if (a.wrap) addWrap(acc, t, rgb(a.wrap));
+  if (a.wrap) addWrap(acc, t, rgb(a.wrap), motif);
   if (a.gamosa) addGamosa(acc, t);
   const hat = a.hat || (a.hairStyle === 'cap' ? 'cap' : null);
   if (hat) addHat(acc, t, hat, rgb(a.hatColor || CAPS[(a.top.charCodeAt(1) + a.top.charCodeAt(3)) % CAPS.length]));

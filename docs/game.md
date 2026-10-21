@@ -112,6 +112,7 @@ logged.
 | `photo:taken` | `{ placeId, name }` (`placeId` null if no landmark in shot) | worldobjects |
 | `binocular:spotted` | `{ placeId, name }` | worldobjects |
 | `item:used` | `{ id }` | items |
+| `outfit:changed` | `{ id }` (`null` when taken off) | items (`wearItem`) |
 | `shop:bought` | `{ shopId, id, price }` | items |
 | `delivery:done` | `{ reward, onTime }` | worldobjects |
 | `quest:started` / `quest:updated` / `quest:completed` | `{ id, title, step?, reward? }` | quests |
@@ -199,8 +200,11 @@ label: string | () => string, kind?, priority = 0, enabled?: () => bool, onInter
 shows the prompt through `hud.setPrompt`), `tryInteract() -> bool`, `getFocused()`.
 
 ### items.js (gameplay)
-`ITEMS` (`{ id: { name, price, desc, use? } }`), `SHOPS` (`{ shopId: { name, owner, items: [id] } }`),
-`openShop(shopId, owner?, title?) -> Promise`, `useItem(id) -> bool`.
+`ITEMS` (`{ id: { name, price, desc, use?, wear? } }`), `SHOPS` (`{ shopId: { name, owner, items: [id] } }`),
+`openShop(shopId, owner?, title?) -> Promise`, `useItem(id) -> bool`, `wearItem(id) -> bool`, `isWorn(id)`.
+Outfits (`mekhela_muga`, `mekhela_pat`, `dhoti_kurta`, sold at New Assam Dresses) carry `wear`, a partial appearance: wearing one
+sets `state.wear = { id, ...wear }`, which player.js lays over `state.look` (it is kept in the bag, and taken off the same way).
+A mekhela's woven motifs take `appearance.motif` (default: the blouse colour).
 
 ### content/shopkeepers.js (content)
 `initShopkeepers()` (called by quests.js), `nearestShop(signName, x, y) -> bay | null`. One keeper per open shopfront on Mother Teresa
