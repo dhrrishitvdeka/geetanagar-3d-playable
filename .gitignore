@@ -4,3 +4,13 @@ pipeline/tiles_cache/
 *.log
 vendor/
 screenshots/
+
+# only the game goes to GitHub: research, pipeline and notes stay local
+pipeline/
+docs/
+NOTES.md
+vite.verify.config.js
+.claude/
+.env
+.env.*
+*.local
