@@ -3,7 +3,8 @@ import { scene } from '../core/context.js';
 import { GEO, clsAt, hAt, hash2, pointInPoly, rng } from '../core/geo.js';
 import { inViewWedge, sightTop } from './deck.js';
 import { LANDMARK_STYLE, decorateLandmark } from './landmarks.js';
-import { nearestOnMain } from './mainroad.js';
+import { MAINP } from './mainroad.js';
+import { nearestMainIdx } from './road/mainidx.js';
 import { buildShopfronts } from './shops.js';
 import { BAY, FLOOR, facadeMaterials } from './bldg/facades.js';
 import { MeshBuilder, simplifyRing } from './bldg/mesh.js';
@@ -26,6 +27,7 @@ const CONCRETE = new THREE.Color('#a8a49b'), REBAR = new THREE.Color('#4a3b30'),
 
 const BLD = [], SHOPLIST = [], tanks = [], ROOFS = []; // ROOFS: the flat roofs, for the clutter in details.js
 const C = (hex) => new THREE.Color(hex);
+const dMain = (i, x, y) => Math.hypot(MAINP[i][0] - x, MAINP[i][1] - y); // distance to main-road vertex i
 
 // everything about a building that does not depend on its neighbours: floors, heights, roof type, style, colours
 function massing(b, bi) {
@@ -127,7 +129,7 @@ function buildAll() {
       const p = pts[i], q = pts[(i + 1) % n], L = Math.hypot(q[0] - p[0], q[1] - p[1]);
       const nx = (q[1] - p[1]) / L, ny = -(q[0] - p[0]) / L, mx = (p[0] + q[0]) / 2, my = (p[1] + q[1]) / 2; // outward for CCW rings
       let mainFacing = false;
-      if (b.d < 45 && L >= 2) { const [d0] = nearestOnMain(mx, my), [d1] = nearestOnMain(mx + nx * 4, my + ny * 4); mainFacing = d1 < d0 - 2 && d0 < 30; }
+      if (b.d < 45 && L >= 2) { const i0 = nearestMainIdx(mx, my, 30); if (i0 >= 0) { const d0 = dMain(i0, mx, my), qx = mx + nx * 4, qy = my + ny * 4, i1 = d0 > 2 ? nearestMainIdx(qx, qy, d0 - 2) : -1; mainFacing = d0 < 30 && i1 >= 0 && dMain(i1, qx, qy) < d0 - 2; } } // facing the road: the wall's outward step brings it 2 m+ closer
       const road = mainFacing || clsAt(mx + nx * 3.5, my + ny * 3.5) === 1 || clsAt(mx + nx * 6, my + ny * 6) === 1;
       const e = { p, q, L, n: [nx, ny], u: [(q[0] - p[0]) / L, (q[1] - p[1]) / L], mainFacing, road, gA: hAt(p[0], p[1]), gB: hAt(q[0], q[1]) };
       const surveyed = SURVEY && b.c[0] >= SURVEY.x0 && b.c[0] <= SURVEY.x1;

@@ -5,6 +5,7 @@ import { ASSET, modelParts } from './assets.js';
 import { inDeck, inViewWedge, sightTop } from '../world/deck.js';
 import { blockedBySeg } from '../world/geom.js';
 import { MEDIAN_TREES } from '../world/mainroad.js';
+import { gridNearest } from '../world/road/mainidx.js';
 import { EXTRA_TREES } from '../world/streetlife.js';
 import { PARK_TREES } from '../world/streets.js';
 import { TD, TW } from '../world/terrain.js';
@@ -44,8 +45,9 @@ const PLANT_SLICES = { n: 6, inner: 30 };
 const NEAR_CELL = 32, nearGrid = new Map();
 let lastPlantAt = null;
 
-const mainPts = GEO.main;
-function distMain(x, y) { let b = 1e9; for (const p of mainPts) { const d = (p[0] - x) ** 2 + (p[1] - y) ** 2; if (d < b) b = d; } return Math.sqrt(b); }
+const mainPts = GEO.main, nearMain = gridNearest(mainPts); // the same vertices as before (not MAINP), so the tree layout does not change
+// distance to the main road, 99 beyond 20 m (only 'within 20 m' is asked)
+function distMain(x, y) { const i = nearMain(x, y, 20); return i < 0 ? 99 : Math.hypot(mainPts[i][0] - x, mainPts[i][1] - y); }
 const pick = (r, table) => { let u = r() * table.reduce((a, b) => a + b[1], 0); for (const [k, w] of table) { u -= w; if (u <= 0) return k; } return table[0][0]; };
 const MIX = {
   forest: [['mango', 30], ['rain', 22], ['jack', 32], ['bamboo', 9], ['areca', 7]],
