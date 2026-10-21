@@ -161,6 +161,8 @@ function buildClips(t, anim) {
     }
     t.speed[key] = cnt ? sum / cnt : { walk: 1.3, formal: 1.3, jog: 3.2, sprint: 5.2, crouch: 1 }[key]; t.off[name] = fi / N;
   }
+  // where the pelvis ends up when seated (model units: y up, z forward of the feet); animate() moves the body so it lands on the seat
+  sample(t.clips.Sitting_Idle_Loop, 0); t.sitY = pel.matrixWorld.elements[13]; t.sitZ = pel.matrixWorld.elements[14];
   // where the hands hang in the idle pose: held props are designed there and mapped back to the bind pose (rigid on the hand bone)
   sample(t.clips.Idle_Loop, 0);
   for (const s of ['l', 'r']) {
@@ -516,6 +518,12 @@ function makeRealCharacter(appearance = {}, opts = {}) {
     for (const n in ent) { const e = ent[n]; e.act.time = e.t; e.act.setEffectiveWeight(e.w / sum2); }
     rig.fresh = false;
     rig.mixer.update(0);
+    // ----- on a seat: the clip leaves the hips wherever the shins put them (behind the feet, at knee height), so shift the whole body
+    // to sit the pelvis on the seat point at the seat's height (o.seatH above the feet). Eased in through sitting down, out through
+    // standing up; kids on a bench end up with their feet off the ground, as they should.
+    const sw = !(o.seatH > 0) ? 0 : sm === 2 ? 1 : sm === 1 ? smooth(0.35, 0.9, sst / dur('Sitting_Enter')) : sm === 3 ? 1 - smooth(0.1, 0.6, sst / dur('Sitting_Exit')) : 0;
+    if (sw > 0) pivot.position.set(-t.sitZ * pivot.scale.z * sw, (o.seatH + out.height * 0.045 - t.sitY * pivot.scale.y) * sw, 0);
+    else if (pivot.position.x || pivot.position.y) pivot.position.set(0, 0, 0);
     // the mixer only rewrites a bone whose animated value changed, so what we added last frame must be taken off again first
     const trk = rig.trk; for (let i = 0; i < trk.length; i++) { const k = trk[i]; if (k.on) { if (k.b.quaternion.equals(k.post)) k.b.quaternion.copy(k.pre); k.on = false; } }
     const touch = b => { let k = rig.trkOf.get(b); if (!k) { k = { b, pre: new THREE.Quaternion(), post: new THREE.Quaternion(), on: false }; rig.trkOf.set(b, k); trk.push(k); } if (!k.on) { k.on = true; k.pre.copy(b.quaternion); } };

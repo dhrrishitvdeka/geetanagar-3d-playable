@@ -149,6 +149,26 @@ function buildBenches() {
   const seat = { x: bx, y: by, z, heading: oh }; BENCHES.push(addSeat(seat));
   spot('bench:shelter', bx, by, () => (getPlayer().seated ? 'Stand up' : 'Sit down'), () => { if (getPlayer().seated) setSeated(null); else setSeated(seat); }, { r: 1.5, z });
 }
+// ---------- plastic chairs: put down on demand under people who sit where there is no bench (npc/agents.js) ----------
+const CHAIR_CAP = 24; let chairMesh = null, chairN = 0;
+function chairParts() { // a moulded plastic chair; the origin is where the hips go, the seat top is 0.44 up, the back toward local -x
+  const C = '#e8e4da', a = [piece(BOX(0.42, 0.035, 0.44), C, 0, 0.425, 0), piece(BOX(0.035, 0.42, 0.42), C, -0.22, 0.66, 0, 0, 0, 0.12)];
+  for (const x of [-0.18, 0.19]) for (const z of [-0.19, 0.19]) a.push(piece(BOX(0.035, 0.42, 0.035), C, x, 0.21, z));
+  for (const z of [-0.21, 0.21]) a.push(piece(BOX(0.3, 0.03, 0.035), C, -0.04, 0.62, z)); // arm rests
+  return a;
+}
+function buildChairs() {
+  const parts = chairParts(), g = mergeGeometries(parts, false); for (const p of parts) p.dispose();
+  chairMesh = new THREE.InstancedMesh(g, MAT_SOLID, CHAIR_CAP); chairMesh.count = 0; chairMesh.castShadow = chairMesh.receiveShadow = true;
+  chairMesh.frustumCulled = false; chairMesh.userData.noMerge = true; scene.add(chairMesh);
+}
+// a chair at (x, y) facing map angle h, registered as a one-person seat; null when there is no room left (or before init)
+function placeChair(x, y, h) {
+  if (!chairMesh || chairN >= CHAIR_CAP) return null;
+  const z = groundAt(x, y); dummy.position.set(x, z, -y); dummy.rotation.set(0, h, 0); dummy.scale.set(1, 1, 1); dummy.updateMatrix();
+  chairMesh.setMatrixAt(chairN++, dummy.matrix); chairMesh.count = chairN; chairMesh.instanceMatrix.needsUpdate = true;
+  return addSeat({ x, y, z, heading: h, h: 0.44, single: true });
+}
 function buildPumps() {
   for (let i = 0; i < PUMP_SPOTS.length; i++) {
     let [x, y] = open(PUMP_SPOTS[i][0], PUMP_SPOTS[i][1]); const h = toRoad(x, y) + rnd(-0.4, 0.4), z = groundAt(x, y);
@@ -668,7 +688,7 @@ function initWorldObjects() {
   MAT_GLOW = new THREE.MeshBasicMaterial({ vertexColors: true });
   const st = signTex(); MAT_SIGN = new THREE.MeshStandardMaterial({ map: st, roughness: 0.6, emissive: '#ffffff', emissiveMap: st, emissiveIntensity: 0.2, side: THREE.DoubleSide });
   for (const [name, fn] of [['benches', buildBenches], ['pumps', buildPumps], ['atms', buildATMs], ['shops', buildShops], ['scooters', buildScooters], ['travel', buildTravel], ['jobboard', buildJobBoard],
-    ['bell', buildBell], ['binoculars', buildBinoculars], ['prayers', buildPrayers], ['gamosas', buildGamosas], ['ball', buildBall]]) run(`init ${name}`, fn);
+    ['bell', buildBell], ['binoculars', buildBinoculars], ['prayers', buildPrayers], ['gamosas', buildGamosas], ['ball', buildBall], ['chairs', buildChairs]]) run(`init ${name}`, fn);
   run('init signs', flushSigns);
   try { mergeStatic(PROPS); } catch (err) { console.error('[worldobjects] mergeStatic failed', err); }
   scene.add(PROPS);
@@ -681,4 +701,4 @@ function updateWorldObjects(dt, player) {
   run('pumps', updatePumps, dt); run('binoculars', updateBinoculars, dt, player); run('delivery', updateDelivery, dt);
 }
 
-export { initWorldObjects, updateWorldObjects, takePhoto, setWorldMarker, clearWorldMarker, startDelivery, getDelivery, cancelDelivery, setBallPosition, getBall, setScooterUnlocked, FIELD, ballRef, ballInField, npcKick, pushBall };
+export { initWorldObjects, updateWorldObjects, takePhoto, setWorldMarker, clearWorldMarker, startDelivery, getDelivery, cancelDelivery, setBallPosition, getBall, setScooterUnlocked, FIELD, ballRef, ballInField, npcKick, pushBall, placeChair };

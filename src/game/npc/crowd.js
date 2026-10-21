@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { camera, scene } from '../../core/context.js';
-import { charMaterial, evalFrames, geo, mulA, newFrames, rootMatrix } from './humanoid.js';
+import { HIP_Y, JN, NJ, charMaterial, evalFrames, geo, mulA, newFrames, poseTarget, rootMatrix } from './humanoid.js';
 
 // ---------- the crowd: one InstancedMesh per part type (14 draw calls for every NPC), matrices composed on the CPU ----------
 // Body parts exist once per NPC (arms and legs twice); clothing and props are packed, so a part's count is the number of
@@ -15,6 +15,7 @@ let built = false, drawn = 0;
 const F = newFrames(), R = new Float32Array(16);
 const frustum = new THREE.Frustum(), vp = new THREE.Matrix4(), sph = new THREE.Sphere();
 const FRAME_OF = [F.hips, F.torso, F.head, F.handL, F.handR]; // indexed by FR.* in humanoid.js
+const SIT_HIP = (() => { const J = new Float32Array(NJ); poseTarget(J, 3, 0, 0, 0, 0, 0); return HIP_Y + J[JN.ROOTY]; })(); // hip height of the sit pose at scale 1
 
 function initCrowd() {
   if (built) return; built = true;
@@ -50,7 +51,8 @@ function drawCrowd(list, count) {
     if (!frustum.intersectsSphere(sph)) continue;
     if (nd >= CAP) break; nd++;
     const rc = n.recipe, T = rc.tint, J = n.rig.step(Math.min(n.animDt, 0.1), n.state, n.speed, n.hold, false); n.animDt = 0;
-    rootMatrix(R, n.x, n.z, n.y, n.heading, rc.s, rc.bw); evalFrames(F, R, J, rc.hs);
+    const lift = n.seatH > 0 && n.state === 'sit' ? n.seatH + 0.07 * rc.s - SIT_HIP * rc.s : 0; // the sit pose's hips are over the feet: raise them to the seat
+    rootMatrix(R, n.x, n.z + lift, n.y, n.heading, rc.s, rc.bw); evalFrames(F, R, J, rc.hs);
     put('torso', F.torso, null, T.torso); put('pelvis', F.hips, null, T.pelvis); put('head', F.head, null, T.head);
     put('uArm', F.uArmL, null, T.uArm); put('uArm', F.uArmR, null, T.uArm); put('fArm', F.fArmL, null, T.fArm); put('fArm', F.fArmR, null, T.fArm);
     put('thigh', F.thighL, null, T.thigh); put('thigh', F.thighR, null, T.thigh); put('shin', F.shinL, null, T.shin); put('shin', F.shinR, null, T.shin);

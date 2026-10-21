@@ -16,7 +16,7 @@ import { Animator, buildRecipe, randomAppearance } from './humanoid.js';
 import { initRealPool, releaseReal, updateRealPool } from './realpool.js';
 import { buildNav, findPath, nearestNode, nodeXY, randomPoint, randomPointDir } from './nav.js';
 import { claimSeat, releaseSeat } from '../seats.js';
-import { FIELD, ballInField, ballRef, npcKick, pushBall } from '../worldobjects.js';
+import { FIELD, ballInField, ballRef, npcKick, placeChair, pushBall } from '../worldobjects.js';
 import { kickLoose, nearLoose } from '../loose.js';
 
 // ---------- NPC simulation: ambient crowd, named people, behaviours, avoidance, talking ----------
@@ -529,7 +529,8 @@ function stepNPC(n, dt, cheap) {
   if (n.goto) moveGoto(n, dt); else behave(n, dt);
   if (n.behavior === 'sit' && !n.goto) {
     // a sitter placed next to a bench sits on it: snap to the nearest free slot, facing the way the bench faces
-    if (!n.seatTry && n.idleState === 'sit') { n.seatTry = true; const st = claimSeat(n.x, n.y, n); if (st) { n.x = st.x; n.y = st.y; n.z = st.z; n.heading = st.heading; n.faceT = null; } }
+    // nothing to sit on within reach: put a plastic chair down where they are, facing the way they face (a chair, not thin air)
+    if (!n.seatTry && n.idleState === 'sit') { n.seatTry = true; let st = claimSeat(n.x, n.y, n); if (!st && placeChair(n.x, n.y, n.heading)) st = claimSeat(n.x, n.y, n); if (st) { n.x = st.x; n.y = st.y; n.z = st.z; n.heading = st.heading; n.seatH = st.h; n.faceT = null; } }
     n.state = n.idleState; n.speed = 0; n.vx = n.vy = 0; return;
   }
   locomote(n, dt, cheap);
@@ -650,14 +651,14 @@ function npcBlocking(x, y, r = 0.45, ignoreId) {
 function npcSay(id, text, ms) { const n = BYID.get(id); if (n) say(n, text, ms || 3200); }
 function npcSetBehavior(id, behavior, opts = {}) {
   const n = BYID.get(id); if (!n) return;
-  releaseSeat(n); n.seatTry = false; n.behavior = behavior; n.goto = null; n.path = null; n.pi = 0; n.wait = 0; n.hasW = false; n.tget = opts.target || null; n.faceT = opts.face || null;
+  releaseSeat(n); n.seatTry = false; n.seatH = 0; n.behavior = behavior; n.goto = null; n.path = null; n.pi = 0; n.wait = 0; n.hasW = false; n.tget = opts.target || null; n.faceT = opts.face || null;
   if (opts.anchor) n.anchor = opts.anchor; if (opts.dist) n.dist = opts.dist; if (opts.path) n.def = { ...n.def, path: opts.path };
   n.idleState = behavior === 'sit' ? (opts.floor ? 'floor' : 'sit') : 'idle';
   if (behavior === 'play' && !n.anchor) n.anchor = { x: n.x, y: n.y, r: 8 };
 }
 function npcMoveTo(id, x, y, opts = {}) {
   const n = BYID.get(id); if (!n) return;
-  n.goto = { x, y, run: !!opts.run, onArrive: opts.onArrive, path: null }; n.path = null; n.pi = 0; n.faceT = null; if (n.behavior === 'sit') { n.idleState = 'idle'; releaseSeat(n); n.seatTry = false; }
+  n.goto = { x, y, run: !!opts.run, onArrive: opts.onArrive, path: null }; n.path = null; n.pi = 0; n.faceT = null; if (n.behavior === 'sit') { n.idleState = 'idle'; releaseSeat(n); n.seatTry = false; n.seatH = 0; }
   queuePath(n);
 }
 function npcFace(id, x, y) { const n = BYID.get(id); if (!n) return; n.heading = Math.atan2(y - n.y, x - n.x); n.faceT = [x, y]; }

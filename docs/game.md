@@ -201,7 +201,14 @@ shows the prompt through `hud.setPrompt`), `tryInteract() -> bool`, `getFocused(
 `setScooterUnlocked(on)` (rideable scooters ask for permission until the quest unlocks them), `FIELD` (pitch frame: centre
 `cx, cy`, long axis `ux, uy`, extents `lo, hi` along it and `wlo, whi` across it, `goals`), `ballRef()` (the live ball, read-only,
 null before init), `ballInField()`, `npcKick(angle, speed, lift) -> bool` (refused while held, after a goal or within 0.3 s of the
-last kick), `pushBall(x, y, r, speed)` (a body shoving the ball out of itself).
+last kick), `pushBall(x, y, r, speed)` (a body shoving the ball out of itself), `placeChair(x, y, heading) -> seat | null` (a
+plastic chair registered as a one-person seat; agents.js puts one under a sitter with no bench in reach).
+
+### seats.js (gameplay mechanics)
+`addSeat({ x, y, z, heading, h?, single? })`, `claimSeat(x, y, who, r = 1.6) -> { x, y, z, h, heading, seat, k } | null`,
+`releaseSeat(who)`, `SEATS`. (x, y) is where the hips go, z the ground, h the sitting surface above z (benches 0.47, chairs
+0.44). Anyone sitting passes h on as `seatH` (NPC field, `animate({ seatH })` for the rigged models): the models then put the
+pelvis on the seat point at that height instead of where the sitting clip leaves it.
 
 ### loose.js (gameplay mechanics)
 `initLoose()`, `updateLoose(dt, player)`, `nearLoose(kind, x, y, r) -> obj | null`, `kickLoose(obj, angle, speed, lift)`.

@@ -31,7 +31,7 @@ const BINOCULAR_FOV = 14;
 const P = { x: 0, y: 0, z: 0, heading: Math.PI / 2, speed: 0, vx: 0, vy: 0, riding: null, seated: false, crouching: false, cameraMode: 'third', stamina: 1 };
 const ZERO = { x: 0, y: 0 };
 const SAFE = { x: 0, y: 0, heading: Math.PI / 2 }; // last place the player stood on foot; what the autosave writes
-const ANIM = { state: 'idle', speed: 0 };
+const ANIM = { state: 'idle', speed: 0, seatH: 0 };
 const STEP = { x: 0, y: 0, vol: 0.6 };
 
 let ch = null, group = null, scale = 1;                       // current character model, its group, its height scale
@@ -312,7 +312,7 @@ function updateCharacter(dt) {
   else if (!onGround) st = 'jump';
   else if (P.crouching) st = 'crouch';
   else if (P.speed > 0.4) st = running && P.speed > 3.6 ? 'run' : 'walk';
-  ANIM.state = st; ANIM.speed = P.speed;
+  ANIM.state = st; ANIM.speed = P.speed; ANIM.seatH = P.seated && seat ? seat.h || 0 : 0;
   ch.animate(dt, ANIM);
   placeGroup();
   const show = P.cameraMode === 'third' && effDist > 0.75;
