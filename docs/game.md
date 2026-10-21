@@ -78,7 +78,7 @@ console times the scene and shadow passes on the GPU at three fixed spots and co
    parked vehicles into colliders, so it runs before the NPC walk graph is built), `initAnimals`, `initNPCs`,
    `initWorldObjects`, `initLoose`, `initQuests` (in this order; each in try/catch).
 4. Title menu. On `ui:start` the game loads or starts a save and the loop starts updating the game systems.
-5. Each frame while playing: `advanceClock`, `updatePlayer`, `updateNPCs`, `updateAnimals`, `updateTraffic`,
+5. Each frame while playing: `advanceClock`, `updatePlayer`, `updateNPCs`, `updateRoutines`, `updateAnimals`, `updateTraffic`,
    `updateWorldObjects`, `updateLoose`, `updateQuests`, `updateInteract`; always: shadows, vegetation LOD, sky, `renderFrame`,
    `updateLabels`, `updateMap`, `updateHUD`, `endFrame`.
 
@@ -103,6 +103,7 @@ logged.
 | `place:discovered` | `{ id, name }` | state (`discover`), called by quests |
 | `npc:talk` | `{ id, name }` | agents (player talked to an NPC) |
 | `npc:bumped` | `{ id }` | agents |
+| `bus:stopped` | `{ x, y, stop }` (a city bus pulled in at the stand; door open ~7 s) | traffic |
 | `player:hit` | `{ dx, dy, speed, kind }` | traffic (unit push direction in map space) |
 | `vehicle:mount` / `vehicle:dismount` | `{ kind }` | player |
 | `dog:fed` / `animal:pet` | `{ id, kind }` | animals |
@@ -127,7 +128,8 @@ logged.
 `setFlag(k, v)`, `getFlag(k)`, `markCollected(id) -> isNew`, `isCollected(id)`, `discover(id, name) -> isNew`,
 `advanceClock(dtSeconds)`, `nextDay()`, `clockText(hour)`, `saveSettings()`.
 Shape: `{ money, inv: {id: qty}, quests: {id: {status, step, data}}, flags, collected: [], discovered: [],
-stats: {distance, goals, deliveries, photos, talks}, time, day, player: {x, y, heading} | null, look,
+stats: {distance, goals, deliveries, photos, talks}, time, day, player: {x, y, heading} | null, look, wear,
+friends: {id: {p, day, gift, perk, name, title, likes?}},
 settings: {sens, volume, invertY, labels, fov}, stamina (0..1), buffs: {name: secondsLeft} }`.
 
 ### input.js (engine)
@@ -174,7 +176,7 @@ range and `when()` (if given) holds. `make(spot)` returns `[{ role, x, y, headin
 `def` joins the NPC's def (`onTalk`, `shop`, `greet`, `chat`...). Behaviour `dance`: a slow Bihu ring round `anchor`, arms raised.
 NPC: `{ id, name, role, title, x, y, z, heading, speed, state, behavior, def, talking }`.
 def: `{ id, name, role, title?, x, y, heading?, appearance? (partial), seed?, behavior?: idle|wander|patrol|sit|vendor|
-play|follow|pace|football, anchor?: {x, y, r}, path?: [[x, y]], talk? (default true), onTalk?: async (npc) => void,
+play|follow|pace|football|dance, anchor?: {x, y, r}, path?: [[x, y]], talk? (default true), onTalk?: async (npc) => void,
 lines?: [string] }`. Every NPC with `talk !== false` gets an interactable (`npc:<id>`); talking stops it, turns it to
 the player, emits `npc:talk`, then runs `def.onTalk(npc)` or a random line from `def.lines` / the ambient pool.
 Head look: each frame an NPC may set `lookOn` with `lookX, lookY, lookZ` (a map point and absolute height); `npc/realpool.js` turns
@@ -182,6 +184,26 @@ the rigged model's head and neck toward it. Footballers watch the ball, play kid
 in front of them. The field's kids are a 3-a-side match (`behavior: 'football'`, `team` 0/1, `fpos` keep/def/att; team 0 attacks
 `FIELD.goals[1]`); they act on the ball only through `npcKick` and `pushBall`. Do not use `n.slot` for anything: it is the
 rigged-model slot from `realpool.js`.
+Ambient life (all inside agents.js):
+- Crowd by the hour: the ambient target is `TARGET * crowdAt(hour)` (`CROWD` table: about 0.45 at 6:30, full for the school and
+  office rush, 0.55 in the midday lull, full again in the evening). Extra people go when they fall behind, or out of sight behind
+  the camera. From 11 am to 3 pm about a fifth of new walkers carry an umbrella against the sun.
+- Walking together: about a quarter of walkers bring a companion (`n.comp`; the companion has `lead` and behaviour `companion`, and
+  is not one of the `AMB` slots). It keeps to the walker's left, matches pace, stops and turns with them, and goes when they are
+  recycled. Walkers wait for a companion who is talking to the player.
+- Spectators: while the match is on, walkers within 80 m of the field may go and watch (`pc === 2`, `watching`), entering and
+  leaving by the field gate (`fieldGateX()`), since the walk graph stops at the railing. They follow the ball and cheer goals.
+- Bumps are remembered: knocking into someone sets `grudge` (120 s). They glare, keep further from the player, grumble if the player
+  comes back after leaving, and open with it when talked to; talking clears it.
+- Hawkers: a `vendor` with `def.calls` (shopkeepers, see below) or a stall seller at Hatigarh calls out to a player passing 2.5-12 m
+  away, one cry every 7-14 s across the whole town.
+- Road crossings: at the kerb a walker waits for a gap: only vehicles heading for the crossing and due within 3.5 s count (less as
+  the wait goes on: 2.4 s after 6 s, 1.6 s after 12 s), and they watch the nearest one coming; they cross a little faster.
+- Greetings and small talk follow the hour (`GREET_AM`, `TIME_LINES`).
+- Getting unstuck: a walker who keeps moving but gets no closer to the waypoint for 5 s asks for a fresh route; a second one that
+  also gets nowhere means they are boxed in, and out of the player's sight (18 m) they step onto the waypoint. A route never skips
+  its own goal. nav.js starts a route from a nearby node that can be walked to in a straight line (checked every 0.3 m, so thin
+  railings count).
 
 ### animals.js (animals and traffic)
 `initAnimals()`, `updateAnimals(dt, player)`, `allAnimals() -> [{ id, kind, name?, x, y, heading, state }]`,
@@ -192,6 +214,10 @@ Kinds: `dog cow goat crow`. One named dog, Pori, lives at Hatigarh (around (-470
 ### traffic.js (animals and traffic)
 `initTraffic()` (also turns parked vehicles into colliders), `updateTraffic(dt, player)`,
 `vehicleAt(x, y, r = 0.5) -> vehicle | null` (moving traffic), `getTrafficVehicles() -> [{ x, y, heading, kind, speed }]`.
+Models: `world/road/vehicles.js` builds each kind once from primitives (no downloaded assets) and bakes it per material; the moving
+fleet bakes `baked(kind, true)`, which adds the riders and drivers (their shirt is a third, per-vehicle tinted mesh), while parked
+vehicles stand empty. City buses keep a rough timetable (one in every 35-60 s of spawns is a bus) and stop at the bus stand in the kerb lane on its side
+for ~7 s, emitting `bus:stopped`.
 
 ### interact.js (gameplay)
 `register(spec) -> { id, remove(), set(props) }` with `spec = { id, x?, y?, z?, pos?: () => [x, y, z], r = 2,
@@ -210,6 +236,8 @@ A mekhela's woven motifs take `appearance.motif` (default: the blouse colour).
 `initShopkeepers()` (called by quests.js), `nearestShop(signName, x, y) -> bay | null`. One keeper per open shopfront on Mother Teresa
 Rd, from `SHOP_BAYS` in world/shops.js (`{ row, name, tag, kind, sells, x, y, z, heading, fx, fy }`: the keeper's spot on the shop
 floor, the customer's spot `fx, fy` on the footpath). Shops whose sign matches a table in `SHOPS` sell through "Buy something".
+Sweets, tea, fruit, bakery, hotel and cloth keepers have street cries (`CALLS`, passed as `def.calls`); the mekhela cries belong to the
+dress shop only, since footwear and garment shops share the cloth counter.
 Quest `rongali_bihu` (Nabin Da at the field gate, after `morning_sah`): dress for Bihu and bring two til pitha, then the dance on the
 field from 4:30 pm.
 
@@ -243,11 +271,40 @@ Shop ids: `tea_stall` (Bina, park forecourt x -121), `pan_tea` (Khagen, field ki
 Page classes: `player.js` toggles `first-person`, `binocular` and `riding` on `#app` so the HUD can style for them.
 
 ### quests.js (gameplay content)
-`initQuests()` (also spawns the named NPCs from `content/npcs.js`), `updateQuests(dt, player)`, `getQuestLog() ->
+`initQuests()` (also spawns the named NPCs from `content/npcs.js`, then sets up the shopkeepers, friendships, daily routines and the
+soundscape), `updateQuests(dt, player)`, `getQuestLog() ->
 [{ id, title, desc, status, steps: [{ text, done }] }]`, `startQuest(id)`.
 
 ### content/npcs.js, content/places.js (gameplay)
-`NAMED` (named NPC defs) and `spawnNamedNPCs()`; `PLACES` (`[{ id, name, x, y, r, kind }]`).
+`NAMED` (named NPC defs) and `spawnNamedNPCs()`; `PLACES` (`[{ id, name, x, y, r, kind }]`). Every named conversation starts
+with `friends.noteTalk(npc)`; `shopTalk` passes the seller's friend discount to `openShop`.
+
+### npc/routines.js (characters)
+`initRoutines()` (after the named NPCs exist), `updateRoutines(dt, player)` (main loop, after `updateNPCs`), `regulars()`.
+Fifteen regulars (`kind: 'resident'`, so the rigged-model pool does not favour them) each get a home behind an open lane gate
+(`GATE_POSTS` from world/compound.js) and a day plan of legs `{ at, to, mode: stay|gone|board, ... }`: commuters walk to the bus
+stand, wait on their own bit of kerb and get on a bus (`bus:stopped`), and come back on one from about 4 pm; students go to school
+and hang about after class (the field side by the high school, or their own college gate); homemakers do the morning shopping at a
+kiosk and take an evening cup at Bina Baideu's or Khagen Da's; the old walk their lanes at dawn and sit on the mat at the namghar
+from about 4 pm. Departures are worked back from arrival times by walking distance: the clock runs 30x real time, so a 150 m walk
+takes about an hour of the day. Nobody is simulated off-screen: `virtualAt(regular, hour)` says where they are from the plan, and
+they are placed there (walking, or doing their thing) when the player comes within 170 m, and taken out again past 230 m. Each day
+the plans are rolled again. Named schedules (`DAY`): Dadu has his own lal sah at Bina Baideu's at dawn once `morning_sah` is
+done, and walks to the namghar for the evening naam unless the Bihu chapter is on; Anjali photographs the field from the school
+side after class. Quest markers follow live positions, so they need no changes.
+
+### friends.js (gameplay)
+`initFriends()`, `noteTalk(npc)` (at the start of every conversation), `greetLine(npc)`, `passGreeting(npc)` (agents.js
+`setGreeter`), `friendLevel(id)`, `discountFor(id)`, `peopleList()`, `LEVELS`. Points: +3 for the first chat of a day, quests done
+for someone (`QUEST_BONDS`), +6 for a gift they like or +10 for their favourite (`LIKES`, one gift a day, never an item an active
+quest still needs). Levels Stranger / Acquaintance (6) / Friend (18) / Close friend (36) change how they address you (elders:
+bopai / aai, children: Dada / Baideu, others: dada / baideu, close friends: bondhu), their greeting in passing, 10% / 20% off at
+their shop, and a close friend's present on your first visit of the day (`PERK`). The journal lists everyone you have met.
+
+### content/soundscape.js (content)
+`initSoundscape()`: registers the town's sounds with `addSoundSpot`: the mandir bell (busy at dawn), conches for the morning puja
+and at dusk from houses near the listener, pressure cookers at lunchtime, the school bells (7:51, 10:54, 1:33), naam-kirtan from
+the four namghars from 4 pm, and glasses and the kettle at Bina Baideu's stall.
 
 ### hud.js (UI)
 `initHUD()`, `updateHUD(dt)`, `toast(text, { kind: info|good|warn|quest, ms })`, `setPrompt(text | null, key = 'E')`,
@@ -267,8 +324,11 @@ The minimap reuses the explorer's base image (`makeMiniBase()` / `miniBase` from
 
 ### audio.js (UI)
 `initAudio()` (unlocks on the first user gesture), `sfx(name, { x, y, vol, pitch })`, `setListener(x, y, heading)`,
-`setAmbience({ traffic, birds, crowd })` (0..1), `engine(on, speed01)`, `setVolume(v)`.
-Sounds: `step coin pickup bell horn kick goal ui error quest bark moo caw whistle shutter splash door engine_start`.
+`setAmbience({ traffic, birds, crowd })` (0..1), `engine(on, speed01)`, `setVolume(v)`,
+`addSoundSpot({ x, y | at(lx, ly) -> [x, y] | null, r, hours: [from, to), every: [min, max] s, sound, vol, when? })`: a sound that
+belongs to a place and an hour, played when the listener is within `r`.
+Sounds: `step coin pickup bell horn kick goal ui error quest bark moo caw whistle shutter splash door engine_start dhol cooker conch
+kirtan teastall airbrake schoolbell`.
 
 ## Rules added after the design review
 

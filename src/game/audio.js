@@ -68,6 +68,18 @@ function whistleVoice(out, t0, dur, p, rise) { // pea whistle: sine with fast vi
   noise(out, t0, dur, 'highpass', 3200, 3200, 0.7, 0.12, 0.02);
 }
 
+// a looping white-noise band into out, with its own gain envelope (attack, hold, release)
+function hiss(out, t0, len, type, f, q, peak, att, rel) {
+  const s = ctx.createBufferSource(), bp = ctx.createBiquadFilter(), g = ctx.createGain(); s.buffer = white; s.loop = true; bp.type = type; bp.frequency.value = f; bp.Q.value = q;
+  env(g, t0, att, peak, Math.max(0, len - att - rel), rel); s.connect(bp); bp.connect(g); g.connect(out); s.start(t0, Math.random() * 1.5); s.stop(t0 + len + 0.05); return g;
+}
+// a sung vowel ("aa") for the kirtan: two detuned saws through two formants, with a singer's vibrato
+function voice(out, t0, dur, f) {
+  const g = ctx.createGain(), bps = []; env(g, t0, 0.09, 0.32, Math.max(0, dur - 0.3), 0.21); g.connect(out);
+  for (const [fr, q, k] of [[730, 5, 1], [1090, 6, 0.55], [2440, 7, 0.18]]) { const bp = ctx.createBiquadFilter(), kg = ctx.createGain(); bp.type = 'bandpass'; bp.frequency.value = fr; bp.Q.value = q; kg.gain.value = 2.4 * k; bp.connect(kg); kg.connect(g); bps.push(bp); }
+  for (const det of [-7, 6]) { const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; o.detune.value = det; lfo(o.frequency, 5.3, f * 0.012, t0, dur + 0.1); for (const bp of bps) o.connect(bp); o.start(t0); o.stop(t0 + dur + 0.1); }
+}
+
 // ---------- sounds ----------
 // Each takes (start time, output gain, pitch multiplier) and returns its length in seconds.
 const SFX = {
@@ -146,6 +158,47 @@ const SFX = {
     for (let i = 0; i < 5; i++) { const d = t + 0.05 + Math.random() * 0.6, f = rnd(300, 800) * p; tone(out, 'sine', f, f * 2.2, d, 0.07, 0.18, 0.005); }
     return 1.1;
   },
+  cooker(t, out, p) { // a pressure cooker's whistle from a kitchen: steam through the weight, a sung tone that wavers, then it dies away
+    const f = rnd(2000, 2700) * p, len = rnd(1.1, 1.9), g = ctx.createGain(); env(g, t, 0.22, 0.55, len - 0.6, 0.38); g.connect(out);
+    const o = ctx.createOscillator(), og = ctx.createGain(); o.type = 'sine'; o.frequency.setValueAtTime(f * 0.9, t); o.frequency.linearRampToValueAtTime(f, t + 0.28); lfo(o.frequency, rnd(7, 11), f * 0.012, t, len + 0.1);
+    og.gain.value = 0.45; o.connect(og); og.connect(g); o.start(t); o.stop(t + len + 0.1);
+    hiss(g, t, len, 'bandpass', f * 1.02, 7, 1.1, 0.15, 0.3); hiss(g, t, len, 'highpass', 4500, 0.7, 0.25, 0.15, 0.3); return len + 0.2;
+  },
+  conch(t, out, p) { // a shankha at dusk or puja: a brassy horn that opens up as the breath fills it, blown one to three times
+    const f = rnd(290, 360) * p, n = 1 + (Math.random() * 3 | 0); let d = t;
+    for (let i = 0; i < n; i++) {
+      const len = rnd(1.3, 2.3), o = ctx.createOscillator(), o2 = ctx.createOscillator(), lp = ctx.createBiquadFilter(), g = ctx.createGain(), g2 = ctx.createGain();
+      o.type = 'sawtooth'; o.frequency.setValueAtTime(f * 0.93, d); o.frequency.linearRampToValueAtTime(f, d + 0.3); lfo(o.frequency, 4.6, f * 0.008, d, len + 0.1);
+      o2.type = 'square'; o2.frequency.setValueAtTime(f * 1.995, d + 0.3); g2.gain.value = 0.18; o2.connect(g2); g2.connect(lp);
+      lp.type = 'lowpass'; lp.Q.value = 2.2; lp.frequency.setValueAtTime(600, d); lp.frequency.linearRampToValueAtTime(1900, d + 0.45); lp.frequency.linearRampToValueAtTime(1300, d + len);
+      env(g, d, 0.32, 0.3, len - 0.75, 0.43); o.connect(lp); lp.connect(g); g.connect(out); o.start(d); o2.start(d); o.stop(d + len + 0.1); o2.stop(d + len + 0.1);
+      hiss(out, d, len, 'bandpass', 1500, 1.2, 0.05, 0.2, 0.4); d += len + rnd(0.25, 0.5);
+    }
+    return d - t;
+  },
+  kirtan(t, out, p) { // one bar of naam-kirtan at the namghar: taal cymbals on the beat, the khol drum, and voices answering the call
+    const base = 196 * p, sc = [0, 2, 4, 7, 9, 12], beat = 0.5;
+    for (let i = 0; i < 8; i++) {
+      const d = t + i * beat; // taal: a bright inharmonic "ching", louder on the beat
+      for (const [k, a] of [[1, 0.2], [1.47, 0.14], [2.09, 0.08]]) tone(out, 'sine', 3150 * k, 0, d, 0.45, a * (i % 2 ? 0.55 : 1), 0.001);
+      hiss(out, d, 0.12, 'highpass', 6000, 0.7, 0.08, 0.001, 0.1);
+      if (i % 4 === 0 || i % 4 === 3) tone(out, 'sine', 118, 72, d, 0.3, 0.9, 0.003); // khol, the low head
+      if (i % 2 === 1) { hiss(out, d + 0.25, 0.06, 'bandpass', 1900, 1.4, 0.55, 0.001, 0.05); tone(out, 'triangle', 340, 280, d + 0.25, 0.12, 0.3, 0.002); } // and the slapped high head
+    }
+    let d = t; const start = Math.floor(Math.random() * 3);
+    for (let k = 0; k < 4; k++) { const f = base * 2 ** (sc[(start + (k === 3 ? 0 : Math.floor(Math.random() * 4))) % sc.length] / 12); voice(out, d, 0.96, f); voice(out, d + 0.02, 0.94, f * 2 * 0.998); d += 1; }
+    return 4;
+  },
+  teastall(t, out, p) { // a tea stall: glasses clinking, or the kettle hissing on the stove
+    if (Math.random() < 0.6) { for (let i = 0; i < 2 + (Math.random() * 2 | 0); i++) { const d = t + i * rnd(0.12, 0.3), f = rnd(2900, 3600) * p; tone(out, 'sine', f, 0, d, 0.22, 0.25, 0.001); tone(out, 'sine', f * 1.71, 0, d, 0.14, 0.1, 0.001); } return 1; }
+    hiss(out, t, 2.4, 'bandpass', 3400, 2.5, 0.22, 0.6, 0.6); tone(out, 'sine', 3400 * p, 3450 * p, t + 0.5, 1.4, 0.04, 0.4); return 2.5;
+  },
+  airbrake(t, out, p) { noise(out, t, 0.9, 'highpass', 2600, 1800, 0.7, 1.1, 0.01); noise(out, t, 0.35, 'bandpass', 900, 600, 1, 0.5, 0.01); tone(out, 'sine', 170 * p, 110, t + 0.75, 0.12, 0.6, 0.004); return 1.1; }, // a bus pulling in: the air brakes, then the door
+  schoolbell(t, out, p) { // the school's bell: a hanging brass plate struck again and again
+    const n = 8 + (Math.random() * 5 | 0);
+    for (let i = 0; i < n; i++) { const d = t + i * 0.32, f = 820 * p; for (const [k, a, dec] of [[1, 0.5, 1.1], [2.32, 0.3, 0.7], [3.9, 0.16, 0.4], [5.6, 0.08, 0.25]]) tone(out, 'sine', f * k, 0, d, dec, a * 0.5, 0.001); hiss(out, d, 0.04, 'bandpass', 3000, 1, 0.4, 0.001, 0.03); }
+    return n * 0.32 + 1.2;
+  },
   door(t, out, p) { for (const d of [0, 0.15, 0.42]) { tone(out, 'sine', 190 * p, 120 * p, t + d, 0.09, 0.9, 0.002); noise(out, t + d, 0.05, 'bandpass', 420, 300, 1.4, 1.4, 0.002); } return 0.6; },
   engine_start(t, out, p) { // starter cranks (amplitude pulses), then the engine catches
     const o = ctx.createOscillator(), am = ctx.createGain(), g = ctx.createGain(), lp = ctx.createBiquadFilter();
@@ -210,6 +263,21 @@ function engine(on, speed01) {
   eng.wob.frequency.setTargetAtTime(6 + 5 * s, now, 0.2);
 }
 
+// ---------- sounds that belong to places (registered by content/soundscape.js) ----------
+// { x, y } or at(listenerX, listenerY) -> [x, y] | null (asked afresh each time, e.g. a house near the listener), r: heard within,
+// hours: [from, to), every: [min, max] seconds between plays, sound, vol, when(): extra condition
+const PLACES = [];
+function addSoundSpot(o) { PLACES.push({ next: 0, vol: 1, ...o }); }
+function placeTick(now) {
+  const tm = state.time;
+  for (const s of PLACES) {
+    if (now < s.next || tm < s.hours[0] || tm >= s.hours[1] || (s.when && !s.when())) continue;
+    const pos = s.at ? s.at(lx, ly) : [s.x, s.y];
+    if (!pos || Math.hypot(pos[0] - lx, pos[1] - ly) > s.r) { s.next = now + 2; continue; }
+    s.next = now + rnd(s.every[0], s.every[1]); sfx(s.sound, { x: pos[0], y: pos[1], vol: s.vol });
+  }
+}
+
 // ---------- ambience ----------
 let beds = null, ambOverride = null, ambAt = 0, ambLvl = { traffic: 0, birds: 0, crowd: 0 }, nextKoel = 0;
 function buildBeds() {
@@ -245,6 +313,7 @@ function ambTick() {
   const t = ctx.currentTime;
   beds.traffic.gain.setTargetAtTime(tr * 0.38, t, 0.5); beds.crowd.gain.setTargetAtTime(cr * 0.2, t, 0.5); beds.birds.gain.setTargetAtTime(bi > 0.01 ? 1 : 0, t, 0.5);
   if (live() && bi > 0.03 && Math.random() < 1 - Math.exp(-bi * 1.1 * 0.25)) chirp(bi);
+  if (live()) placeTick(t);
 }
 function chirp(level) { // one bird call into the birds bed; a koel-like call now and then
   const t = ctx.currentTime + 0.02, out = ctx.createGain(); out.gain.value = 0.12 + 0.25 * level;
@@ -258,4 +327,4 @@ function chirp(level) { // one bird call into the birds bed; a koel-like call no
   for (let i = 0; i < n; i++) { const up = Math.random() < 0.5, f = base * (1 + 0.05 * i); tone(out, 'sine', f, f * (up ? 1.3 : 0.75), d, rnd(0.04, 0.08), 0.8, 0.006); d += rnd(0.07, 0.12); }
 }
 
-export { initAudio, sfx, setListener, setAmbience, engine, setVolume };
+export { initAudio, sfx, setListener, setAmbience, engine, setVolume, addSoundSpot };

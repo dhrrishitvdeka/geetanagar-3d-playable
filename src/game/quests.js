@@ -5,7 +5,7 @@ import { fieldGateX } from '../world/road/fieldedge.js';
 import { findOpen, walkable } from '../ui/controls.js';
 import { emit, on } from './core/bus.js';
 import { addItem, addMoney, clockText, discover, hasItem, itemCount, removeItem, setFlag, state } from './core/state.js';
-import { addSpot, getNPC, npcSay, npcSetBehavior } from './npc/agents.js';
+import { addSpot, getNPC, npcSay, npcSetBehavior, setGreeter } from './npc/agents.js';
 import { bigMessage, fade, setObjectiveTarget, setQuestTracker, toast } from './hud.js';
 import { addMarker, removeMarker } from './map.js';
 import { clearWorldMarker, getBall, getDelivery, setBallPosition, setScooterUnlocked, setWorldMarker, startDelivery } from './worldobjects.js';
@@ -16,6 +16,9 @@ import { addBuff } from './player.js';
 import { PLACES, PLACE_BY_ID } from './content/places.js';
 import { Aborted, BY_ID, FIELD_ANCHOR, FIELD_C, NAMED, TALK, ask, chat, say, sayAll, shopTalk, spawnNamedNPCs } from './content/npcs.js';
 import { initShopkeepers, nearestShop } from './content/shopkeepers.js';
+import { initFriends, passGreeting } from './friends.js';
+import { initRoutines } from './npc/routines.js';
+import { initSoundscape } from './content/soundscape.js';
 
 // ---------- quest engine ----------
 // state.quests[id] = { status: 'active' | 'done', step, data }. A quest is a list of steps; a step may have
@@ -616,6 +619,7 @@ function initQuests() {
   if (inited) return; inited = true;
   try { spawnNamedNPCs(); } catch (err) { console.error('[quests] spawnNamedNPCs failed', err); }
   try { initShopkeepers(); } catch (err) { console.error('[quests] shopkeepers failed', err); }
+  try { initFriends(); setGreeter(passGreeting); initRoutines(); initSoundscape(); } catch (err) { console.error('[quests] friends and routines failed', err); }
   const MEK = [['#d6b25e', '#e2c57a', '#a01e2c'], ['#efe7d2', '#f2ebd8', '#b3202e']];
   addSpot(DANCE.x, DANCE.y, BIHU_AT, 18, () => Array.from({ length: 8 }, (_, k) => {
     const a = k / 8 * Math.PI * 2, woman = k % 2 === 0, [m, w, b] = MEK[(k >> 1) % 2];
