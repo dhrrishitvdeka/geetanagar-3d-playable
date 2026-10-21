@@ -76,8 +76,9 @@ function buildNav() {
     }
   }
   const shoulderNear = (s, x, y, maxD) => { let best = -1, bd = maxD; for (const [, n] of SH[s]) { const d = Math.hypot(NX[n] - x, NY[n] - y); if (d < bd) { bd = d; best = n; } } return best; };
-  // crossings between the two shoulders: Hatigarh, the bus stand, the field gate and the mandir
-  for (const cx of [HAT.x, -57, -20, 49.5]) {
+  // crossings between the two shoulders: Hatigarh, the bus stand, the field gate and the mandir. The bus stand's is a few metres west
+  // of the shelter (x -57): right at it the north end landed in the corner where the field railing starts (x -58) and walkers got boxed in.
+  for (const cx of [HAT.x, -61.5, -20, 49.5]) {
     let bi = 0, bd = 1e9; MAINP.forEach((p, i) => { const d = Math.abs(p[0] - cx); if (d < bd) { bd = d; bi = i; } });
     const near = s => { let b = -1, bdd = 1e9; for (const [i, n] of SH[s]) { const d = Math.abs(i - bi); if (d < bdd) { bdd = d; b = n; } } return bdd <= 6 ? b : -1; };
     const a = near(1), b = near(-1); if (a < 0 || b < 0) continue;
@@ -160,27 +161,33 @@ function buildNav() {
 }
 
 // ---------- queries ----------
-function nearestNode(x, y) {
+// ok(n): an optional filter, e.g. no road-crossing nodes for somewhere people are meant to stand about
+function nearestNode(x, y, ok) {
   if (!built || !alive) return -1;
   const cx = Math.floor(x / CELL), cy = Math.floor(y / CELL); let best = -1, bd = 1e9;
   for (let r = 0; r <= 6; r++) {
     for (let i = cx - r; i <= cx + r; i++) for (let j = cy - r; j <= cy + r; j++) {
       if (Math.max(Math.abs(i - cx), Math.abs(j - cy)) !== r) continue;
       const l = GRID.get(key(i, j)); if (!l) continue;
-      for (const n of l) { const d = Math.hypot(NX[n] - x, NY[n] - y); if (d < bd) { bd = d; best = n; } }
+      for (const n of l) { if (ok && !ok(n)) continue; const d = Math.hypot(NX[n] - x, NY[n] - y); if (d < bd) { bd = d; best = n; } }
     }
     if (best >= 0 && bd <= r * CELL) break;
   }
-  if (best < 0) for (let n = 0; n < NX.length; n++) if (alive[n]) { const d = Math.hypot(NX[n] - x, NY[n] - y); if (d < bd) { bd = d; best = n; } }
+  if (best < 0) for (let n = 0; n < NX.length; n++) if (alive[n] && (!ok || ok(n))) { const d = Math.hypot(NX[n] - x, NY[n] - y); if (d < bd) { bd = d; best = n; } }
   return best;
 }
 // a start node near (x, y), preferring ones ahead of the walker so a path doesn't open by turning back
+// the first node of a walk: near, ahead rather than behind, and one that can be walked to in a straight line (a node just past a
+// railing or a wall would leave the walker sliding along it)
+const clearTo = (x, y, n) => { const d = Math.hypot(NX[n] - x, NY[n] - y); for (let t = 0.3; t < d; t += 0.3) if (!walkable(x + (NX[n] - x) * t / d, y + (NY[n] - y) * t / d)) return false; return true; };
 function startNode(x, y, hdg) {
-  if (hdg === undefined || hdg === null) return nearestNode(x, y);
-  const cx = Math.floor(x / CELL), cy = Math.floor(y / CELL), hx = Math.cos(hdg), hy = Math.sin(hdg); let best = -1, bs = 1e9;
+  const cx = Math.floor(x / CELL), cy = Math.floor(y / CELL), hx = Math.cos(hdg || 0), hy = Math.sin(hdg || 0), cand = [];
   for (let i = cx - 1; i <= cx + 1; i++) for (let j = cy - 1; j <= cy + 1; j++) { const l = GRID.get(key(i, j)); if (!l) continue;
-    for (const n of l) { const dx = NX[n] - x, dy = NY[n] - y, d = Math.hypot(dx, dy); if (d > 14) continue; const sc = d + (d > 1 && (dx * hx + dy * hy) / d < -0.2 ? 6 : 0); if (sc < bs) { bs = sc; best = n; } } }
-  return best >= 0 ? best : nearestNode(x, y);
+    for (const n of l) { const dx = NX[n] - x, dy = NY[n] - y, d = Math.hypot(dx, dy); if (d > 14) continue; cand.push([d + (hdg != null && d > 1 && (dx * hx + dy * hy) / d < -0.2 ? 6 : 0), n]); } }
+  if (!cand.length) return nearestNode(x, y);
+  cand.sort((a, b) => a[0] - b[0]);
+  for (let k = 0; k < Math.min(cand.length, 6); k++) if (clearTo(x, y, cand[k][1])) return cand[k][1];
+  return cand[0][1];
 }
 function randomPoint(near, minD = 20, maxD = 120) {
   if (!built || !alive) return { x: near ? near.x : 0, y: near ? near.y : 0, node: -1 };

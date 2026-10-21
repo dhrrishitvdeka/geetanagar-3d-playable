@@ -10,20 +10,21 @@ import { emit, on } from '../core/bus.js';
 import { state } from '../core/state.js';
 import { bubble, showDialogue } from '../hud.js';
 import { register, unregister } from '../interact.js';
-import { vehicleAt } from '../traffic.js';
+import { getTrafficVehicles } from '../traffic.js';
 import { drawCrowd, initCrowd } from './crowd.js';
 import { Animator, buildRecipe, randomAppearance } from './humanoid.js';
 import { initRealPool, releaseReal, updateRealPool } from './realpool.js';
-import { buildNav, findPath, nearestNode, nodeXY, randomPoint, randomPointDir } from './nav.js';
+import { buildNav, findPath, isCrossNode, nearestNode, nodeXY, randomPoint, randomPointDir } from './nav.js';
 import { claimSeat, releaseSeat } from '../seats.js';
 import { FIELD, ballInField, ballRef, npcKick, placeChair, pushBall } from '../worldobjects.js';
 import { kickLoose, nearLoose } from '../loose.js';
+import { FIELD_EDGE, fieldGateX } from '../../world/road/fieldedge.js';
 
 // ---------- NPC simulation: ambient crowd, named people, behaviours, avoidance, talking ----------
 const TARGET = { low: 24, medium: 40, high: 64 }[QUALITY] || 40; // ambient population by quality tier
 const NEAR = 60, FAR_DT = 0.15, SPAWN_R = 200, RECYCLE_R = 230;
 const ALL = [], BYID = new Map(), AMB = [], SPOTS = [], PQ = [];
-let ready = false, P = null, ambSeq = 0, hour = 7, camAng = 0, greetT = 8, bubT = 0, spotT = 0;
+let ready = false, P = null, ambSeq = 0, hour = 7, camAng = 0, greetT = 8, bubT = 0, spotT = 0, callT = 4, clk = 0;
 const wrap = a => Math.atan2(Math.sin(a), Math.cos(a));
 const rnd = (a, b) => a + Math.random() * (b - a), pickOf = arr => arr[Math.floor(Math.random() * arr.length)], chance = p => Math.random() < p;
 
@@ -59,6 +60,16 @@ const ROLE_LINES = {
   commuter: ['The bus to the city is always late.', 'I take the same road every day, but I still find new things on it.'],
 };
 const GREET = ['Nomoskar!', 'Ki khobor?', 'Bhal ne?', 'Nomoskar, bhal ne?', 'Aah, nomoskar!'], FLINCH = ['Arey! Saabdhane!', 'Careful!', 'Dhire dhire!'], BANTER = ['Hoi hoi, thik ase.', 'Aru ki khobor?', 'Bhal bhal!', 'Hahaha!'];
+// what people bring up depends on the hour: the morning rush, the midday heat, the evening out
+const TIME_LINES = [
+  [6.5, 9.5, ['The first sah of the morning is the best one of the day.', 'Everyone is rushing to school and office. I am in no hurry.', 'The milkman came late today, so the sah came late too.']],
+  [11, 14.5, ['Too hot to walk in the sun now. Keep to the shade.', 'At this hour even the dogs are asleep under the parked cars.', 'Bhat khalane? Have you eaten? Lunch first, everything else later.']],
+  [15.5, 18, ['The evening breeze is starting. The whole lane comes out now.', 'The boys will be at the field until the light goes.', 'Before the sun goes down I like a cup of sah by the road.']],
+];
+const GREET_AM = ['Suprobhat!', 'Suprobhat, bhal ne?'];
+const GRUMBLE = ['You again! Dhire, dhire.', 'Hoi! Watch where you are going this time.', 'Arey, you nearly knocked me over before!'];
+const CALLS = ['Aloo, piyaj! Potatoes, onions, cheap today!', 'Kol lobo? Fresh bananas!', 'Bilahi, bilahi! Fresh tomatoes!', 'Xaak, xaak! Greens from this morning!', 'Come, come, look. No need to buy!'];
+const FAN = ['Goal! Bhal khelise!', 'Hoi! What a shot!', 'Arey, the keeper was sleeping!'];
 const ROLE_LABEL = { commuter: 'Commuter', shopper: 'Shopper', student: 'Student', elder: 'Elder', jogger: 'Jogger', kid: 'Kid', mekhela: 'Local', sari: 'Local', office: 'Office worker', phone: 'Local', vendor: 'Vendor', priest: 'Priest', guard: 'Guard' };
 
 // ---------- places people walk to (snapped to the walk graph when used) ----------
@@ -74,7 +85,11 @@ function initPlaces() {
   POIS.shop.push([37.7, -39]); // flower carts by the mandir
   POIS.other.push([-57, -74], [-497, -60], [49.5, -45], [FIELD_C[0], GEO.field[1] - 6], [78, 195], [-110, -85]); // bus stand, Hatigarh, mandir, field edge, view point, park forecourt
 }
-const snap = (x, y, out) => { const n = nearestNode(x, y); if (n < 0) { out[0] = x; out[1] = y; return out; } return nodeXY(n, out); };
+// Mother Teresa Rd's carriageway, kerb to kerb (median included): nobody stands about there
+const onRoad = (x, y) => { const [d, i] = nearestOnMain(x, y); return d < asphHalf(i) - 0.2; };
+const offRoad = k => !isCrossNode(k) && !onRoad(nodeXY(k, _sn)[0], _sn[1]), _sn = [0, 0];
+// a node to stand at near (x, y): never one on a road crossing or out on the carriageway
+const snap = (x, y, out) => { const n = nearestNode(x, y, offRoad); if (n < 0) { out[0] = x; out[1] = y; return out; } return nodeXY(n, out); };
 
 // ---------- spatial hash (rebuilt every frame): neighbour queries, collision answers ----------
 const HN = 2048, HEAD = new Int32Array(HN), NEXT = new Int32Array(1024), QOUT = new Array(256);
@@ -111,6 +126,7 @@ function dropFromWorld(n) {
   const a = AMB.indexOf(n); if (a >= 0) AMB.splice(a, 1);
   if (n.spot) { const s = n.spot.npcs.indexOf(n); if (s >= 0) n.spot.npcs.splice(s, 1); }
   const f = FB.indexOf(n); if (f >= 0) FB.splice(f, 1); if (fbFetch === n) fbFetch = null; if (fbChase[0] === n) fbChase[0] = null; if (fbChase[1] === n) fbChase[1] = null;
+  if (n.comp) dropCompanion(n); if (n.lead) { n.lead.comp = null; n.lead = null; }
 }
 let nameUse = new Set();
 function pickName(female) { for (let t = 0; t < 8; t++) { const nm = pickOf(female ? NAMES_F : NAMES_M); if (!nameUse.has(nm)) return nm; } return pickOf(female ? NAMES_F : NAMES_M); }
@@ -120,6 +136,13 @@ const ROLE_KEYS = ['priest', 'guard', 'vendor', 'student', 'elder', 'kid', 'jogg
 function roleHint(def) { const s = ((def.role || '') + ' ' + (def.title || '')).toLowerCase(); for (const k of ROLE_KEYS) if (s.includes(k)) return k; if (/pujari|purohit/.test(s)) return 'priest'; if (/seller|shop|stall|kiosk|owner/.test(s)) return 'vendor'; if (/child/.test(s)) return 'kid'; return 'commuter'; }
 
 // ---------- ambient population ----------
+// how busy the lanes are through the day (1 = TARGET): the school and office rush, a lull in the midday heat, the evening crowd
+const CROWD = [[6.5, 0.45], [7.5, 0.9], [9.5, 1], [11, 0.7], [12.5, 0.55], [14, 0.6], [15.5, 0.9], [17, 1], [18, 0.85]];
+function crowdAt(h) {
+  for (let i = 1; i < CROWD.length; i++) if (h < CROWD[i][0]) { const [h0, a] = CROWD[i - 1], [h1, b] = CROWD[i], t = Math.max(0, (h - h0) / (h1 - h0)); return a + (b - a) * t; }
+  return CROWD[CROWD.length - 1][1];
+}
+const SUN_UMB = ['#161616', '#161616', '#161616', '#2a6fb5', '#7a1c2c', '#3c8a4a']; // black, mostly: an umbrella against the sun is as common here as against rain
 function rollRole() {
   const am = hour >= 7.3 && hour < 9.7, pm = hour >= 13.8 && hour < 16.8, school = am || pm;
   const w = [['commuter', 0.15 + (am ? 0.1 : 0)], ['shopper', 0.12], ['student', 0.06 + (school ? 0.16 : 0)], ['elder', 0.09], ['jogger', hour < 8.8 ? 0.16 : 0.025], ['kid', 0.07 + (pm ? 0.05 : 0)], ['mekhela', 0.1], ['sari', 0.07], ['office', 0.07 + (am ? 0.06 : 0)], ['phone', 0.07]];
@@ -135,22 +158,50 @@ function placeAmbient(n, initial) {
   if (!pt) pt = initial ? randomPoint(P, 14, SPAWN_R) : randomPointDir(P, 120, 190, camAng + Math.PI, 1.25);
   if (!pt || pt.node < 0) return false;
   const app = randomAppearance(Math.random, { role }), female = !!app.female;
+  if (hour >= 11 && hour < 15 && !app.umbrella && !app.phone && role !== 'jogger' && role !== 'kid' && chance(0.22)) { app.umbrella = pickOf(SUN_UMB); app.stick = false; if (app.bagStyle === 'hand') app.bag = null; }
   nameUse.delete(n.name); n.name = pickName(female); nameUse.add(n.name);
   n.role = role; n.title = undefined; n.def = { talk: true, behavior: role === 'kid' ? 'play' : 'wander' }; setLabel(n);
   n.recipe = buildRecipe(app); n.hold = n.recipe.hold; n.x = pt.x; n.y = pt.y; n.z = groundAt(pt.x, pt.y); n.heading = rnd(0, 6.28); n.vx = n.vy = n.speed = 0; n.state = 'idle'; n.idleState = 'idle';
   const sp = SPEEDS[role] || [1.1, 1.5]; n.vWalk = rnd(sp[0], sp[1]); n.run = role === 'jogger'; n.vRun = role === 'jogger' ? n.vWalk : rnd(2.4, 3.4);
   n.path = null; n.pi = 0; n.goto = null; n.wait = rnd(0, 4); n.pathReq = false; n.talking = false; n.flinchT = 0; n.faceT = null; n.acc = 0; n.stuck = 0; n.tget = null; n.hasW = false; n.dead = false;
+  n.grudge = 0; n.away = n.grumbled = n.watching = false; n.watchCd = 0;
   n.behavior = n.def.behavior; n.anchor = role === 'kid' ? { x: pt.x, y: pt.y, r: rnd(7, 12) } : null; n.rig = new Animator();
   return true;
 }
 function spawnAmbient(initial) {
   const n = makeNPC('amb' + (ambSeq++), '', 'commuter', P.x, P.y, 0, {}, { talk: true }, 'ambient');
   if (!placeAmbient(n, initial)) { return false; }
-  AMB.push(n); addToWorld(n); return true;
+  AMB.push(n); addToWorld(n); addCompanion(n); return true;
 }
 function recycle(n) {
-  if (n.talking || n.goto) return; unregister('npc:' + n.id);
-  if (placeAmbient(n, false)) reg(n); else { dropFromWorld(n); }
+  if (n.talking || n.goto || (n.comp && n.comp.talking)) return; dropCompanion(n); unregister('npc:' + n.id);
+  if (placeAmbient(n, false)) { reg(n); addCompanion(n); } else { dropFromWorld(n); }
+}
+// ---------- walking together: two friends, an old couple, a mother with her child ----------
+// Now and then a walker brings company. The companion is not one of the AMB slots: it keeps to the walker's left a step apart,
+// matches their pace (the walker waits if it falls behind), stops when they stop and turns to them, and leaves with them.
+const PAIRS = { student: ['student'], elder: ['elder'], shopper: ['shopper', 'mekhela'], mekhela: ['kid', 'mekhela', 'sari'], sari: ['kid', 'sari'], commuter: ['commuter', 'office'], office: ['office'] };
+function addCompanion(n) {
+  const roles = PAIRS[n.role]; if (!roles || !chance(0.24)) return;
+  const role = pickOf(roles), kid = role === 'kid', side = kid ? 0.6 : 0.78, a = n.heading + Math.PI / 2, x = n.x + Math.cos(a) * side, y = n.y + Math.sin(a) * side;
+  if (!walkable(x, y)) return;
+  const app = randomAppearance(Math.random, { role, kid: kid || undefined });
+  const c = makeNPC('amb' + (ambSeq++), pickName(!!app.female), role, x, y, n.heading, app, { talk: true, behavior: 'companion' }, 'ambient');
+  c.behavior = 'companion'; c.lead = n; c.side = side; c.vRun = rnd(2.6, 3.4); n.comp = c;
+  n.vWalk = c.vWalk = Math.min(n.vWalk, kid ? 1.05 : 1.3); n.tp = rnd(0, 6); c.tp = n.tp + 2; // tp: when they turn to each other while walking
+  nameUse.add(c.name); addToWorld(c);
+}
+function dropCompanion(n) { const c = n.comp; if (!c) return; n.comp = null; c.lead = null; if (!c.dead) dropFromWorld(c); }
+function companion(n, dt) {
+  const L = n.lead; if (!L || L.dead) { n.behavior = 'wander'; n.lead = null; return; }
+  const h = L.heading, ox = Math.cos(h + Math.PI / 2) * n.side - Math.cos(h) * 0.15, oy = Math.sin(h + Math.PI / 2) * n.side - Math.sin(h) * 0.15;
+  let tx = L.x + ox, ty = L.y + oy; if (!walkable(tx, ty)) { tx = L.x - ox; ty = L.y - oy; } // a wall on the left: fall in on the right
+  const d = Math.hypot(tx - n.x, ty - n.y);
+  if (d > 30 && (!P || Math.hypot(P.x - n.x, P.y - n.y) > 40)) { n.x = tx; n.y = ty; return; } // lost each other out of sight
+  if (L.speed > 0.2 || d > 1.2) { want(tx + L.vx * 0.3, ty + L.vy * 0.3, d > 3 ? n.vRun : Math.max(L.speed, 0.6) + d * 0.8, L.speed < 0.2); n.idleState = 'idle'; return; }
+  const b = L.watching ? ballRef() : null, f = L.talking && P ? P : b || (L.mate && !L.mate.dead ? L.mate : L); // stopped: face whoever the walker is talking to, the match, or the walker
+  n.faceT = aim(n, f.x, f.y); if (b) { n.lookOn = true; n.lookX = b.x; n.lookY = b.y; n.lookZ = b.z; }
+  if ((n.t2 -= dt) <= 0) { n.t2 = rnd(1.5, 3.5); n.idleState = n.idleState === 'talk' || L.talking || b ? 'idle' : 'talk'; }
 }
 
 // ---------- fixed spots: vendors, sitters, chatting pairs, kids at play (appear when the player is within ~200 m) ----------
@@ -216,14 +267,40 @@ function follow(n, dt) {
   const p = n.path; if (!p || n.pi >= p.length) return false;
   let w = p[n.pi], d = Math.hypot(w[0] - n.x, w[1] - n.y);
   if (d < 0.9 + n.speed * 0.15) { n.pi++; n.stuck = 0; if (n.pi >= p.length) return false; w = p[n.pi]; d = Math.hypot(w[0] - n.x, w[1] - n.y); }
-  if (w[2] === 1 && n.pi > 0 && p[n.pi - 1][2] !== 1 && d < 3 && vehicleAt(n.x, n.y, 16)) { W.go = false; return true; } // wait at the kerb for traffic to pass
-  want(w[0], w[1], n.goto && n.goto.run ? n.vRun : n.run ? n.vRun : n.vWalk, false);
-  if (n.speed < 0.1 && W.go) { n.stuck += dt; if (n.stuck > 3) { n.pi++; n.stuck = 0; } } else n.stuck = 0;
+  if (w[2] === 1 && n.pi > 0 && p[n.pi - 1][2] !== 1 && d < 3 && !gapToCross(n, dt)) { W.go = false; return true; } // wait at the kerb for a gap
+  n.kerbT = 0;
+  want(w[0], w[1], (n.goto && n.goto.run ? n.vRun : n.run ? n.vRun : n.vWalk) * (w[2] === 1 ? 1.35 : 1), false); // a brisker step across the road
+  if (n.speed < 0.1 && W.go) { n.stuck += dt; if (n.stuck > 3) { if (n.pi < p.length - 1) n.pi++; n.stuck = 0; } } else n.stuck = 0; // never skip the goal itself: that would count as arriving
+  // moving but getting no closer (sliding along a wall with the waypoint behind it): after 5 s, ask for a fresh route from here
+  // A second fresh route that gets no further either means they are boxed in (a strip between a railing and a wall): out of the
+  // player's sight they step onto the waypoint, as unstick() does for someone who has stopped dead.
+  const same = n.pw && n.pw[0] === w[0] && n.pw[1] === w[1]; // by place: a fresh route to the same node is still the same waypoint
+  if (d < (n.bestD ?? 1e9) - 0.4) { n.bestD = d; n.pw = w; n.progT = 0; n.replans = 0; } else if (!same) { n.bestD = d; n.pw = w; n.progT = 0; } else if (W.go && (n.progT += dt) > 5) {
+    n.progT = 0;
+    if (++n.replans >= 2 && (!P || Math.hypot(P.x - n.x, P.y - n.y) > 18)) { n.x = w[0]; n.y = w[1]; n.vx = n.vy = 0; n.replans = 0; return true; }
+    if (n.goto) { n.goto.path = null; n.path = null; queuePath(n); } else { n.path = null; n.wait = rnd(0.2, 0.6); } return true;
+  }
   return true;
+}
+// At the kerb: wait for a gap, not for an empty road. A vehicle only counts if it is coming toward the crossing along a line that
+// passes close by and would get there within a few seconds; one driving away or along another road is ignored. The longer someone
+// has stood there the smaller the gap they will take, as on any Guwahati road. While waiting they watch the nearest one coming.
+function gapToCross(n, dt) {
+  n.kerbT = (n.kerbT || 0) + dt; const need = n.kerbT > 12 ? 1.6 : n.kerbT > 6 ? 2.4 : 3.5; let ok = true, watch = null, wt = 1e9;
+  for (const v of getTrafficVehicles()) {
+    const dx = n.x - v.x, dy = n.y - v.y, d = Math.hypot(dx, dy); if (d > 45) continue;
+    if (d < v.hl + 1.5) { ok = false; watch = v; break; } // right in front of them
+    const close = (dx * v.cs + dy * v.sn) / d * (v.speed || 0), off = Math.abs(-dx * v.sn + dy * v.cs);
+    if (close < 0.3 || off > 9) continue;
+    const t = (d - v.hl) / close; if (t < need) ok = false; if (t < wt) { wt = t; watch = v; }
+  }
+  if (watch && !ok) { n.lookOn = true; n.lookX = watch.x; n.lookY = watch.y; n.lookZ = (watch.z || n.z) + 1; }
+  return ok;
 }
 function queuePath(n) { if (!n.pathReq) { n.pathReq = true; PQ.push(n); } }
 function pickDest(n, out) {
   const r = n.role, am = hour >= 7.3 && hour < 9.7, pm = hour >= 13.8 && hour < 16.8, roll = Math.random();
+  if (r !== 'jogger' && FB.length && n.watchCd <= 0 && Math.hypot(FIELD.cx - n.x, FIELD.cy - n.y) < 80 && chance(0.45) && touchline(n, out)) { n.pc = 2; return true; } // a match on: stop and watch
   let p = null;
   if (r === 'student' && (am || pm) && roll < 0.65) p = pickOf(SCHOOLS);
   else if ((r === 'shopper' || r === 'mekhela' || r === 'sari') && roll < 0.6) p = pickOf(POIS.shop);
@@ -246,14 +323,38 @@ function processPaths() {
     }
     if (n.behavior !== 'wander') continue;
     if (!pickDest(n, _d)) { n.wait = rnd(1.5, 3); continue; }
+    if (n.pc === 2) { const p = findPath(n.x, n.y, gateOut[0], gateOut[1], n.heading); if (p && p.length) { p.push([gateIn[0], gateIn[1]], [_d[0], _d[1]]); n.path = p; n.pi = 0; } else n.wait = rnd(1.5, 4); continue; } // to the match, by the gate
     const p = findPath(n.x, n.y, _d[0], _d[1], n.heading);
     if (p && p.length > 1) { n.path = p; n.pi = 0; } else n.wait = rnd(1.5, 4);
   }
 }
-function arrived(n) { // dwell at the end of a walk: shoppers face the stall, students linger at the gate
+// a spot along the touchline on their side, just outside the band the kids play in (their outfield spots stay within ~9 m of the
+// middle; the open ground runs much wider, so its own edge would put the onlookers out of the game)
+// The walk graph stops at the field's railing (lanes and road shoulders only), so spectators go in and out by the field gate:
+// the graph to the road side of it, then straight across the open ground to a spot they can see from the gate.
+let gateIn = null, gateOut = null;
+function fieldGate() {
+  if (!gateIn) { const x = fieldGateX(), [, i] = nearestOnMain(x, -40), off = asphHalf(i); gateOut = beside(x, 1, off + 2.2); gateIn = beside(x, 1, off + FIELD_EDGE.wall + 2.5); }
+  return gateIn;
+}
+const clearWalk = (a, b) => { const d = Math.hypot(b[0] - a[0], b[1] - a[1]); for (let t = 0.3; t < d; t += 0.3) if (!walkable(a[0] + (b[0] - a[0]) * t / d, a[1] + (b[1] - a[1]) * t / d)) return false; return true; };
+function touchline(n, out) {
+  const s = fL(n.x, n.y) > 0 ? 1 : -1, g = fieldGate();
+  for (let k = 0; k < 6; k++) { fieldXY(rnd(FIELD.lo + 8, FIELD.hi - 8), s * rnd(12.5, 16), out); if (walkable(out[0], out[1]) && clearWalk(g, out)) return true; }
+  return false;
+}
+// a spectator: eyes on the ball and the body turning to follow play; the arms go up for a goal (see ball:goal)
+function watchMatch(n, dt) {
+  const b = ballRef(); if (!b || !FB.length) { n.watching = false; n.wait = 0; n.path = [[gateIn[0], gateIn[1]], [gateOut[0], gateOut[1]]]; n.pi = 0; n.pc = 3; return; } // the match is over
+  n.faceT = aim(n, b.x, b.y); n.lookOn = true; n.lookX = b.x; n.lookY = b.y; n.lookZ = b.z;
+  if (n.cel > 0 && (n.cel -= dt) <= 0) n.idleState = 'idle';
+}
+function arrived(n) { // dwell at the end of a walk: shoppers face the stall, students linger at the gate, spectators watch the match
   n.path = null; const r = n.role;
+  if (n.pc === 2) { n.wait = rnd(40, 110); n.watching = true; return; }
+  if (n.pc === 3) { n.pc = 0; n.wait = 0; return; } // out of the field gate: straight on to somewhere else
   n.wait = r === 'student' && n.pc ? rnd(15, 40) : r === 'shopper' || r === 'mekhela' || r === 'sari' ? (n.pc ? rnd(6, 14) : rnd(2, 6)) : r === 'elder' ? rnd(6, 20) : r === 'phone' ? rnd(5, 15) : r === 'jogger' ? rnd(0.5, 2) : rnd(2, 9);
-  if (n.pc && POIS.shop.length) { let best = null, bd = 12; for (const s of POIS.shop) { const d = Math.hypot(s[0] - n.x, s[1] - n.y); if (d < bd) { bd = d; best = s; } } n.faceT = best; }
+  if (n.pc === 1 && POIS.shop.length) { let best = null, bd = 12; for (const s of POIS.shop) { const d = Math.hypot(s[0] - n.x, s[1] - n.y); if (d < bd) { bd = d; best = s; } } n.faceT = best; }
 }
 function moveGoto(n, dt) {
   const g = n.goto;
@@ -263,13 +364,13 @@ function moveGoto(n, dt) {
 // two wanderers passing within 2 m now and then stop to chat for a few seconds (not joggers or kids, never while the player watches up close)
 function meet(n, dt) {
   n.meetCd = (n.meetCd == null ? rnd(2, 8) : n.meetCd) - dt; if (n.meetCd > 0) return;
-  n.meetCd = rnd(5, 10); if (n.role === 'jogger' || n.role === 'kid' || n.kind !== 'ambient') return;
+  n.meetCd = rnd(5, 10); if (n.role === 'jogger' || n.role === 'kid' || n.kind !== 'ambient' || onRoad(n.x, n.y)) return; // not in the middle of the road
   const c = collect(n.x, n.y, 2.2);
   for (let i = 0; i < c; i++) {
     const o = QOUT[i]; if (o === n || o.behavior !== 'wander' || o.pause > 0 || o.role === 'jogger' || o.role === 'kid' || o.kind !== 'ambient') continue;
     if (Math.hypot(o.x - n.x, o.y - n.y) > 2 || !chance(0.15)) continue;
     const t = rnd(4, 9); n.pause = t; o.pause = t + rnd(-0.5, 0.5); n.mate = o; o.mate = n; n.t2 = 0; o.t2 = rnd(1, 2); o.meetCd = rnd(20, 40); n.meetCd = rnd(20, 40);
-    if (P && Math.hypot(P.x - n.x, P.y - n.y) < 14 && chance(0.3)) say(n, pickOf(GREET), 2000);
+    if (P && Math.hypot(P.x - n.x, P.y - n.y) < 14 && chance(0.3)) say(n, greeting(n), 2000);
     break;
   }
 }
@@ -281,8 +382,13 @@ function behave(n, dt) {
         if (n.pause <= 0 || !o || o.dead) { n.pause = 0; n.idleState = 'idle'; n.faceT = null; n.mate = null; } else { n.t2 -= dt; if (n.t2 <= 0) { n.t2 = rnd(1.5, 3.5); n.idleState = n.idleState === 'talk' ? 'idle' : 'talk'; } }
         break;
       }
-      if (n.path) { meet(n, dt); if (!follow(n, dt)) arrived(n); } else if (n.wait > 0) n.wait -= dt; else { n.faceT = null; queuePath(n); }
+      if (n.watchCd > 0) n.watchCd -= dt;
+      if (n.comp && n.comp.talking) { n.faceT = aim(n, n.comp.x, n.comp.y); break; } // the player stopped their companion: wait for them
+      if (n.path) { meet(n, dt); if (!follow(n, dt)) arrived(n); else if (n.comp && W.go && Math.hypot(n.comp.x - n.x, n.comp.y - n.y) > 2.4) W.v *= 0.45; }
+      else if (n.wait > 0) { n.wait -= dt; if (n.watching) { watchMatch(n, dt); if (n.wait <= 0) { n.watching = false; n.idleState = 'idle'; n.watchCd = rnd(150, 300); n.faceT = null; n.path = [[gateIn[0], gateIn[1]], [gateOut[0], gateOut[1]]]; n.pi = 0; n.pc = 3; } } } // seen enough: back out by the gate, and not back for a while
+      else { n.faceT = null; queuePath(n); }
       break;
+    case 'companion': companion(n, dt); break;
     case 'pace': {
       const a = n.anchor || { x: n.x, y: n.y, r: 3 };
       if (n.wait > 0) { n.wait -= dt; break; }
@@ -329,6 +435,9 @@ function behave(n, dt) {
       n.t1 -= dt; if (n.t1 > 0) break;
       if (!P) break; const d = Math.hypot(P.x - n.x, P.y - n.y);
       if (n.idleState === 'talk') { n.idleState = 'idle'; n.t1 = rnd(3, 8); } else if (d < 14 && chance(0.5)) { n.idleState = d < 9 && chance(0.3) ? 'wave' : 'talk'; n.t1 = rnd(2, 4); n.faceT = [P.x, P.y]; } else { n.t1 = rnd(2, 6); n.faceT = null; }
+      // calling out to someone walking past: the stall sellers cry their vegetables, shopkeepers with a cry of their own use it
+      const calls = n.def.calls || (n.kind === 'spot' && !n.def.greet ? CALLS : null);
+      if (calls && d > 2.5 && d < 12 && callT <= 0 && !n.talking && chance(0.4)) { say(n, pickOf(calls), 2600); callT = rnd(7, 14); n.idleState = 'wave'; n.faceT = [P.x, P.y]; }
       break;
     }
     case 'chat': {
@@ -458,6 +567,8 @@ on('ball:goal', ({ goal, byPlayer }) => {
     n.cel = rnd(2, 3); n.kickT = 0; n.idleState = n.team === scorer && !byPlayer ? 'wave' : 'idle'; n.faceT = null; n.sx = undefined;
     if (!said && P && Math.hypot(P.x - n.x, P.y - n.y) < 35 && (byPlayer || n.team === scorer)) { say(n, byPlayer ? 'Bhal shot! Nice one!' : pickOf(CHEER), 2200); said = true; }
   }
+  let fan = 0; // the touchline: arms up, and one of them shouts
+  for (const n of ALL) if (n.watching && !n.talking) { n.idleState = 'wave'; n.cel = rnd(1.5, 2.6); if (!fan++ && P && Math.hypot(P.x - n.x, P.y - n.y) < 40) setTimeout(() => { if (!n.dead) say(n, pickOf(FAN), 2400); }, 700); }
 });
 
 // wanting to move but getting nowhere: sidestep at an angle (1 s), then ask for a new route (3 s), then, out of the
@@ -489,7 +600,7 @@ function locomote(n, dt, cheap) {
       // being pushed into head-on; anyone closer than 1 m still pushes apart
       const c = collect(n.x, n.y, 2.7);
       for (let i = 0; i < c; i++) {
-        const o = QOUT[i]; if (o === n) continue; const rx = o.x - n.x, ry = o.y - n.y, dd = Math.hypot(rx, ry); if (dd > 2.6 || dd < 1e-3) continue;
+        const o = QOUT[i]; if (o === n || o === n.comp || o === n.lead) continue; const rx = o.x - n.x, ry = o.y - n.y, dd = Math.hypot(rx, ry); if (dd > 2.6 || dd < 1e-3) continue;
         if (dd < 1.0) { const w = (1.0 - dd) / 1.0; ax -= rx / dd * w * 1.8; ay -= ry / dd * w * 1.8; }
         const ahead = (rx * ux + ry * uy) / dd; if (ahead < 0.35) continue;
         const side = rx * -uy + ry * ux; // > 0: the other is on my left
@@ -499,11 +610,11 @@ function locomote(n, dt, cheap) {
         if (dd < 1.2 && ahead > 0.8 && o.speed < 0.3) slow = Math.min(slow, 0.5); // someone standing right in the way
       }
       if (P) { // the player: give way by stepping round, slow right down only when very close
-        const rx = P.x - n.x, ry = P.y - n.y, dd = Math.hypot(rx, ry);
-        if (dd < 3 && dd > 1e-3) {
+        const rx = P.x - n.x, ry = P.y - n.y, dd = Math.hypot(rx, ry), R = n.grudge > 0 ? 4.5 : 3; // once bumped, twice shy
+        if (dd < R && dd > 1e-3) {
           if (dd < 1.6) { const w = (1.6 - dd) / 1.6; ax -= rx / dd * w * 2.4; ay -= ry / dd * w * 2.4; }
           const ahead = (rx * ux + ry * uy) / dd;
-          if (ahead > 0.3) { const side = rx * -uy + ry * ux, dir = side > 0 ? -1 : 1, k = (3 - dd) / 3 * ahead; ax += -uy * dir * k * 2; ay += ux * dir * k * 2; if (dd < 1.0 && ahead > 0.8) slow = Math.min(slow, 0.25); }
+          if (ahead > 0.3) { const side = rx * -uy + ry * ux, dir = side > 0 ? -1 : 1, k = (R - dd) / R * ahead; ax += -uy * dir * k * 2; ay += ux * dir * k * 2; if (dd < 1.0 && ahead > 0.8) slow = Math.min(slow, 0.25); }
         }
       }
     }
@@ -539,6 +650,7 @@ function stepNPC(n, dt, cheap) {
   if (n.talking) { if (P) { turnTo(n, Math.atan2(P.y - n.y, P.x - n.x), 6, dt); lookAtPlayer(n); } n.state = 'talk'; n.speed = 0; n.vx = n.vy = 0; return; }
   if (n.flinchT > 0) { n.flinchT -= dt; n.x += n.slideX * dt; n.y += n.slideY * dt; n.state = 'flinch'; n.speed = 0; return; }
   if (n.bumpCd > 0) n.bumpCd -= dt; if (n.greetCd > 0) n.greetCd -= dt; if (n.sayCd > 0) n.sayCd -= dt;
+  if (n.grudge > 0) { n.grudge -= dt; if (!n.away && P && Math.hypot(P.x - n.x, P.y - n.y) > 10) n.away = true; } // away: the player has gone off since the bump
   W.go = false;
   if (n.goto) moveGoto(n, dt); else behave(n, dt);
   if (n.behavior === 'sit' && !n.goto) {
@@ -550,21 +662,44 @@ function stepNPC(n, dt, cheap) {
   locomote(n, dt, cheap);
   if (n.kickT > 0 || n.cel > 0) n.state = n.idleState; // kick, throw-in, celebration: the pose holds even while still sliding to a stop
   if (!n.lookOn && !cheap) glance(n);
+  if (!cheap) offTheRoad(n, dt);
+}
+// Standing still on the carriageway (a chat, a spot, a hop out of a dead end) for 2 s: walk to the nearer kerb and carry on from
+// there. Checked about once a second per person; crossing the road, the football and the dance are left alone.
+const _kb = [0, 0];
+function offTheRoad(n, dt) {
+  if (n.speed > 0.2 || n.talking || n.behavior === 'football' || n.behavior === 'dance' || n.zFix !== undefined) { n.roadT = 0; return; }
+  if ((n.roadChk = (n.roadChk || rnd(0, 1)) - dt) > 0) return; n.roadChk = 1;
+  const [d, i] = nearestOnMain(n.x, n.y); if (d >= asphHalf(i) - 0.2) { n.roadT = 0; return; }
+  if ((n.roadT = (n.roadT || 0) + 1) < 2) return; n.roadT = 0;
+  const p = MAINP[i], nr = NRM[i], s = (n.x - p[0]) * nr[0] + (n.y - p[1]) * nr[1] >= 0 ? 1 : -1;
+  const t = (hashStr(n.id) & 1 ? 0.6 : -0.6); // two people talking end up side by side, not on one spot
+  for (const off of [1.6, 2.6, 3.6]) { _kb[0] = p[0] + nr[0] * s * (asphHalf(i) + off) - nr[1] * t; _kb[1] = p[1] + nr[1] * s * (asphHalf(i) + off) + nr[0] * t; if (walkable(_kb[0], _kb[1])) break; }
+  if (n.anchor) { n.anchor = { ...n.anchor, x: _kb[0], y: _kb[1] }; n.hasW = false; } // whatever they were doing, they do it on the footpath now
+  if (n.goto) { n.goto.path = null; n.path = null; queuePath(n); return; } // already going somewhere: a fresh route from here
+  n.pause = 0; n.wait = 0; n.goto = { x: _kb[0], y: _kb[1], run: false, onArrive: null, path: [[_kb[0], _kb[1]]] }; n.path = n.goto.path; n.pi = 0;
 }
 // where the head turns (realpool.js reads lookOn / lookX / lookY / lookZ): someone close by with the player in front of them
 // notices the player; people stopped for a word look at each other. The body keeps its heading, only the head and neck follow.
 function lookAtPlayer(n) { n.lookOn = true; n.lookX = P.x; n.lookY = P.y; n.lookZ = (P.z || 0) + 1.55; }
 function glance(n) {
-  if (P && n.state !== 'run') { const dx = P.x - n.x, dy = P.y - n.y, d2 = dx * dx + dy * dy; if (d2 < 49 && dx * Math.cos(n.heading) + dy * Math.sin(n.heading) > -0.3 * Math.sqrt(d2)) { lookAtPlayer(n); return; } }
-  const o = n.partner || n.mate; if (o && !o.dead && Math.hypot(o.x - n.x, o.y - n.y) < 3) { n.lookOn = true; n.lookX = o.x; n.lookY = o.y; n.lookZ = o.z + 1.5 * o.recipe.s; }
+  if (P && n.state !== 'run') { const dx = P.x - n.x, dy = P.y - n.y, d2 = dx * dx + dy * dy; if (d2 < (n.grudge > 0 ? 81 : 49) && (n.grudge > 0 || dx * Math.cos(n.heading) + dy * Math.sin(n.heading) > -0.3 * Math.sqrt(d2))) { lookAtPlayer(n); return; } } // bumped: a hard look, wherever they face
+  const pal = n.comp || n.lead, o = n.partner || n.mate || (pal && (n.speed < 0.2 || Math.sin(clk * 0.8 + n.tp) > 0.55) ? pal : null); // a pair walking together turn to each other now and then
+  if (o && !o.dead && Math.hypot(o.x - n.x, o.y - n.y) < 3) { n.lookOn = true; n.lookX = o.x; n.lookY = o.y; n.lookZ = o.z + 1.5 * o.recipe.s; }
 }
 
 // ---------- speech and talking ----------
 function say(n, text, ms = 3200) { bubble('npc:' + n.id, n._hfn, text, ms); }
+// greeter: content can supply a personal greeting (friends.js: people who know you call you dada, baideu, bondhu...)
+let greeter = null;
+const setGreeter = fn => { greeter = fn; };
+const greeting = n => (greeter && n && greeter(n)) || (hour < 11 && chance(0.5) ? pickOf(GREET_AM) : pickOf(GREET));
 function pickLines(n) {
   const d = n.def, own = d.lines && d.lines.length ? d.lines : null, out = [];
   if (own) { out.push(pickOf(own)); if (own.length > 1 && chance(0.4)) { let b = pickOf(own); if (b === out[0]) b = own[(own.indexOf(b) + 1) % own.length]; out.push(b); } return out; }
-  const rl = ROLE_LINES[n.role]; out.push(rl && chance(0.45) ? pickOf(rl) : pickOf(LINES));
+  if (n.grudge > 0) out.push('You are the one who nearly knocked me over! Thik ase, it is fine. Just go slowly, no?');
+  const rl = ROLE_LINES[n.role], tl = TIME_LINES.find(t => hour >= t[0] && hour < t[1]);
+  out.push(rl && chance(0.45) ? pickOf(rl) : tl && chance(0.35) ? pickOf(tl[2]) : pickOf(LINES));
   if (chance(0.4)) { let b = pickOf(LINES); if (b === out[0]) b = pickOf(LINES); if (b !== out[0]) out.push(b); }
   return out;
 }
@@ -576,12 +711,12 @@ async function talkTo(n) {
     if (n.def.onTalk) await n.def.onTalk(n);
     else for (const text of pickLines(n)) { const r = await showDialogue({ speaker: n.name, role: n.title || ROLE_LABEL[n.role] || 'Local', text }); if (r === null) break; } // null: closed by the HUD, treat as "Bye"
   } catch (e) { console.error('[npc] talk failed', e); }
-  finally { n.talking = false; n.faceT = null; }
+  finally { n.talking = false; n.faceT = null; n.grudge = 0; } // talked it over: forgiven
 }
 
 // ---------- reactions to the player ----------
 function reactions(dt) {
-  if (bubT > 0) bubT -= dt; if (greetT > 0) greetT -= dt;
+  if (bubT > 0) bubT -= dt; if (greetT > 0) greetT -= dt; if (callT > 0) callT -= dt;
   const fast = (P.speed || 0) > 4.2 || !!P.riding;
   if (fast) {
     const c = collect(P.x, P.y, 1.3);
@@ -591,6 +726,7 @@ function reactions(dt) {
       let vx = P.vx || Math.cos(P.heading || 0), vy = P.vy || Math.sin(P.heading || 0); const vl = Math.hypot(vx, vy) || 1; vx /= vl; vy /= vl;
       let sx = -vy, sy = vx; if (sx * dx + sy * dy < 0) { sx = -sx; sy = -sy; }
       const mv = n.behavior === 'sit' ? 0 : 2.0; n.flinchT = 0.55; n.slideX = sx * mv; n.slideY = sy * mv; n.bumpCd = 4; n.path = n.goto ? n.path : null; n.pathReq = false;
+      n.grudge = 120; n.away = n.grumbled = false; // remembered for a couple of minutes
       if (n.behavior === 'wander' && !n.goto) n.wait = rnd(0.3, 1);
       if (bubT <= 0) { say(n, pickOf(FLINCH), 2200); bubT = 1.4; }
       emit('npc:bumped', { id: n.id });
@@ -598,7 +734,11 @@ function reactions(dt) {
   }
   if (greetT <= 0 && !fast) {
     const c = collect(P.x, P.y, 4.5);
-    for (let i = 0; i < c; i++) { const n = QOUT[i]; if (n.talking || n.greetCd > 0 || n.dead || n.flinchT > 0) continue; if (chance(0.3)) { say(n, pickOf(GREET), 2400); n.greetCd = 90; greetT = rnd(12, 26); break; } }
+    for (let i = 0; i < c; i++) {
+      const n = QOUT[i]; if (n.talking || n.dead || n.flinchT > 0) continue;
+      if (n.grudge > 0) { if (n.away && !n.grumbled) { say(n, pickOf(GRUMBLE), 2600); n.grumbled = true; greetT = rnd(6, 12); break; } continue; } // met again after the bump
+      if (n.greetCd > 0) continue; const known = greeter && greeter(n); if (known || chance(0.3)) { say(n, greeting(n), 2400); n.greetCd = known ? 60 : 90; greetT = rnd(12, 26); if (known && n.speed < 0.2 && !n.talking) n.idleState = 'wave'; break; } // someone who knows you always says hello
+    }
     if (greetT <= 0) greetT = 2;
   }
 }
@@ -615,18 +755,24 @@ function initNPCs() {
 }
 // first frame with a player: fill the ambient population around them
 function fillInitial() {
-  hour = state.time; for (let k = 0, tries = 0; AMB.length < TARGET && tries < TARGET * 3; k++, tries++) spawnAmbient(true);
+  hour = state.time; const goal = Math.round(TARGET * crowdAt(hour)); for (let k = 0, tries = 0; AMB.length < goal && tries < goal * 3; k++, tries++) spawnAmbient(true);
 }
 let filled = false;
 function updateNPCs(dt, player) {
   if (!ready || !player) return;
-  P = player; hour = state.time;
+  P = player; hour = state.time; clk += dt;
   const dd = camera.getWorldDirection(_v3); camAng = Math.atan2(-dd.z, dd.x);
   if (!filled) { filled = true; fillInitial(); }
   rebuildHash();
-  // ambient upkeep: top up (at most two per frame), recycle people left far behind
-  if (AMB.length < TARGET) for (let k = 0; k < 2 && AMB.length < TARGET; k++) { if (!spawnAmbient(false)) break; }
-  let rc = 0; for (let i = 0; i < AMB.length && rc < 2; i++) { const n = AMB[i], dx = n.x - P.x, dy = n.y - P.y; if (dx * dx + dy * dy > RECYCLE_R * RECYCLE_R) { recycle(n); rc++; } }
+  // ambient upkeep: top up to the hour's crowd (at most two per frame), recycle people left far behind; when the crowd is to
+  // shrink (the midday lull) the ones left behind go instead, and now and then someone well out of sight behind the camera goes home
+  const goal = Math.round(TARGET * crowdAt(hour)), over = AMB.length - goal;
+  if (over < 0) for (let k = 0; k < 2 && AMB.length < goal; k++) { if (!spawnAmbient(false)) break; }
+  let rc = 0; for (let i = 0; i < AMB.length && rc < 2; i++) {
+    const n = AMB[i], dx = n.x - P.x, dy = n.y - P.y, d2 = dx * dx + dy * dy;
+    if (d2 > RECYCLE_R * RECYCLE_R) { if (over > rc && !n.talking && !n.goto) dropFromWorld(n); else recycle(n); rc++; }
+    else if (over > 2 && !rc && d2 > 90 * 90 && dx * Math.cos(camAng) + dy * Math.sin(camAng) < 0 && !n.talking && !n.goto && !n.real && !(n.comp && n.comp.real)) { dropFromWorld(n); rc++; }
+  }
   if ((spotT -= dt) <= 0) { spotT = 0.5; manageSpots(); }
   processPaths();
   footballBrain(dt);
@@ -648,7 +794,7 @@ function spawnNPC(def) {
   // the rigged bodies come in two kinds, so named people need a definite one: explicit, else read from the hand-written look
   if (A) app.female = def.female !== undefined ? !!def.female : A.female !== undefined ? !!A.female : /mekhela|sari|skirt/.test(A.bottomStyle || '') || A.topStyle === 'blouse' || A.hairStyle === 'long' || A.hairStyle === 'bun';
   let heading = def.heading; if (heading === undefined && Array.isArray(def.face)) heading = Math.atan2(def.face[1] - def.y, def.face[0] - def.x);
-  const n = makeNPC(def.id, def.name || 'Local', def.role || hint, def.x, def.y, heading || 0, app, def, 'named');
+  const n = makeNPC(def.id, def.name || 'Local', def.role || hint, def.x, def.y, heading || 0, app, def, def.kind || 'named'); // kind 'resident': the regulars of npc/routines.js
   n.behavior = def.behavior || 'idle'; n.idleState = n.behavior === 'sit' ? (def.floor ? 'floor' : 'sit') : 'idle'; n.anchor = def.anchor || null; n.vWalk = rnd(1.0, 1.25);
   if (n.behavior === 'play') { n.anchor = n.anchor || { x: def.x, y: def.y, r: 8 }; n.vRun = rnd(2.8, 3.6); }
   if (n.behavior === 'vendor') n.t1 = rnd(0, 4);
@@ -678,4 +824,4 @@ function npcMoveTo(id, x, y, opts = {}) {
 function npcFace(id, x, y) { const n = BYID.get(id); if (!n) return; n.heading = Math.atan2(y - n.y, x - n.x); n.faceT = [x, y]; }
 function removeNPC(id) { const n = BYID.get(id); if (n) dropFromWorld(n); }
 
-export { initNPCs, updateNPCs, spawnNPC, getNPC, allNPCs, npcBlocking, npcSay, npcSetBehavior, npcMoveTo, npcFace, removeNPC, addSpot };
+export { initNPCs, updateNPCs, spawnNPC, getNPC, allNPCs, npcBlocking, npcSay, npcSetBehavior, npcMoveTo, npcFace, removeNPC, addSpot, setGreeter };

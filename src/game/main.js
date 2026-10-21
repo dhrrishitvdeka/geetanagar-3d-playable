@@ -20,12 +20,14 @@ import { buildHatigarh, buildPoles, buildTraffic } from '../world/streetlife.js'
 import { buildStreets } from '../world/streets.js';
 import { setFieldGateOpen } from '../world/road/fieldedge.js';
 import { buildCompoundWalls } from '../world/compound.js';
+import { buildDetails } from '../world/details.js';
 import { applyGroundTextures, paintGround } from '../world/terrain.js';
 import { emit, on } from './core/bus.js';
 import { CLOCK, advanceClock, hasSave, load, newGame, nextDay, save, state } from './core/state.js';
 import { endFrame, initInput, pressed, requestLock, setInputGate, setKeysCaptured } from './input.js';
 import { dismount, getPlayer, getSafePos, initPlayer, setCameraMode, getCameraMode, setLook, teleport, updatePlayer } from './player.js';
 import { initNPCs, updateNPCs } from './npc/agents.js';
+import { updateRoutines } from './npc/routines.js';
 import { preloadCharacters } from './npc/realchars.js';
 import { initAnimals, updateAnimals } from './animals.js';
 import { initTraffic, updateTraffic } from './traffic.js';
@@ -61,7 +63,7 @@ let spawn = { x: 0, y: 0, heading: Math.PI / 2 };
   await new Promise(r => setTimeout(r, 30));
   safe('paintGround', paintGround); safe('applyGroundTextures', applyGroundTextures); safe('buildAll', buildAll);
   setFieldGateOpen(true, -26); // open the field gate where the road frontage is clear
-  safe('buildStreets', buildStreets); safe('buildCompoundWalls', buildCompoundWalls);
+  safe('buildStreets', buildStreets); safe('buildCompoundWalls', buildCompoundWalls); safe('buildDetails', buildDetails);
   safe('buildMandir', buildMandir); safe('buildKiosks', buildKiosks); safe('buildDeck', buildDeck); safe('buildHatigarh', buildHatigarh);
   safe('buildTraffic', () => buildTraffic({ lanes: false })); safe('buildPoles', buildPoles); safe('buildOuter', buildOuter); // moving traffic replaces the frozen lane vehicles
   const palms = safe('collectTrees', collectTrees) || [];
@@ -186,7 +188,7 @@ renderer.setAnimationLoop(now => {
         moveSun(false);
         updatePlayer(dt);
         const p = getPlayer();
-        updateNPCs(dt, p); updateAnimals(dt, p); updateTraffic(dt, p); updateWorldObjects(dt, p); updateLoose(dt, p); updateQuests(dt, p);
+        updateNPCs(dt, p); updateRoutines(dt, p); updateAnimals(dt, p); updateTraffic(dt, p); updateWorldObjects(dt, p); updateLoose(dt, p); updateQuests(dt, p);
         updateInteract(p);
         setListener(p.x, p.y, p.heading);
         if (!transitioning && (saveT += dt) > 60) { saveT = 0; autosave(); }

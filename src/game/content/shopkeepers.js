@@ -10,6 +10,17 @@ const MEKHELA = [['#d6b25e', '#e2c57a', '#8e1f2f'], ['#efe7d2', '#f2ebd8', '#1f6
 const pick = (a, k) => a[k % a.length];
 const titleCase = s => s.toLowerCase().replace(/\b\w/g, c => c.toUpperCase()).replace(/&/g, 'and');
 
+// what some of them call out to people walking past (agents.js 'vendor'); the rest just wave
+const CALLS = {
+  cloth: ['New stock for Bihu! Come and look!', 'Good quality, fair price. Come in, come in!'], // footwear and garments share the cloth counter
+  dresses: ['Bihu mekhela sador, new stock from Sualkuchi!', 'Come and look, the muga has just come in!'],
+  sweets: ['Garam jalebi! Hot from the oil!', 'Til pitha, fresh this morning!'],
+  bakery: ['Fresh bread, cake, biscuits!'],
+  tea: ['Garam sah! Lal sah, doodh sah!', 'Sah khabo? A cup of tea?'],
+  hotel: ['Bhat ready! Rice, dal, fish!', 'Masor tenga today, come, sit!'],
+  fruit: ['Komola, kol! Oranges, bananas, sweet ones!', 'Anaras from the hills, ripe today!'],
+};
+
 // per kind of shop: role, look, how they greet you, small talk
 const KEEP = {
   cloth: k => ({ role: 'vendor', app: (() => { const [m, w, b] = pick(MEKHELA, k); return { female: true, hairStyle: 'bun', topStyle: 'blouse', top: b, bottomStyle: 'mekhela', bottom: m, wrap: w, motif: b }; })(),
@@ -39,7 +50,7 @@ function initShopkeepers() {
     const kp = (KEEP[b.kind] || KEEP.general)(k), shopTitle = titleCase(b.name);
     const onTalk = npc => shopTalk(npc).catch(e => { if (!(e instanceof Aborted)) console.error('[shopkeepers] talk', e); });
     addSpot(b.x, b.y, 7, 18, () => [{ role: kp.role, x: b.x, y: b.y, z: b.z, heading: b.heading, behavior: 'vendor', fixed: true, title: kp.title || shopTitle, appearance: kp.app,
-      def: { shop: b.sells, shopTitle, greet: kp.greet, chat: kp.chat, onTalk } }], 60);
+      def: { shop: b.sells, shopTitle, greet: kp.greet, chat: kp.chat, calls: CALLS[b.sells === 'dresses' ? 'dresses' : b.kind], onTalk } }], 60);
   });
 }
 // the nearest frontage with a given signboard name to (x, y): where a quest can send you shopping
