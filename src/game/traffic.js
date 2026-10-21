@@ -4,8 +4,8 @@ import { scene } from '../core/context.js';
 import { GEO, hAt } from '../core/geo.js';
 import { QUALITY } from '../render/quality.js';
 import { addCollider, normalsOf, resample } from '../world/geom.js';
-import { HAT, MAINP, NRM, asphHalf, medHalf } from '../world/mainroad.js';
-import { CAR_COLS, PLACED, TOTO_COLS, TWO_COLS, baked } from '../world/road/vehicles.js';
+import { HAT, MAINP, NRM, RF, asphHalf, medHalf, nearestOnMain } from '../world/mainroad.js';
+import { CAR_COLS, PLACED, SHIRT_COLS, TOTO_COLS, TWO_COLS, baked } from '../world/road/vehicles.js';
 import { emit } from './core/bus.js';
 import { sfx } from './audio.js';
 import { animalBlocking } from './animals.js';
@@ -71,7 +71,8 @@ function prepareLanes() {
 
 // ---------- the fleet: instanced meshes ----------
 const REST = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0.3 });
-const KS = {}; // per kind: { meshes: [paint, rest], n (written this frame), live, cap }
+const SHIRTS = SHIRT_COLS.map(c => new THREE.Color(c));
+const KS = {}; // per kind: { meshes: [paint, rest, shirt?], n (written this frame), live, cap }
 function instMesh(geo, mat, cap, tint, shadow) {
   const im = new THREE.InstancedMesh(geo, mat, cap);
   im.count = 0; im.frustumCulled = false; im.castShadow = shadow && QUALITY !== 'low'; im.receiveShadow = true; im.userData.noMerge = true; // moving instances: no culling by a stale bound
@@ -79,10 +80,11 @@ function instMesh(geo, mat, cap, tint, shadow) {
   if (tint) { im.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3); im.instanceColor.setUsage(THREE.DynamicDrawUsage); }
   scene.add(im); return im;
 }
-function buildKind(kind, cap) {
-  const paint = [], rest = []; let paintMat = null;
-  for (const [m, geo] of baked(kind)) {
+function buildKind(kind, cap) { // the paint and the rider's shirt take a colour per vehicle; everything else is baked
+  const paint = [], rest = [], shirt = []; let paintMat = null, shirtMat = null;
+  for (const [m, geo] of baked(kind, true)) {
     if (m.userData.tint) { paintMat = m; paint.push(geo); continue; }
+    if (m.userData.tint2) { shirtMat = m; shirt.push(geo); continue; }
     // everything else keeps its colour as a vertex colour (lamps add their emissive glow, glass is just dark)
     const g = geo.clone(), n = g.attributes.position.count, col = new Float32Array(n * 3), r = m.color.r + m.emissive.r, gr = m.color.g + m.emissive.g, b = m.color.b + m.emissive.b;
     for (let k = 0; k < n; k++) { col[k * 3] = r; col[k * 3 + 1] = gr; col[k * 3 + 2] = b; }
@@ -91,11 +93,15 @@ function buildKind(kind, cap) {
   const meshes = [];
   if (paint.length) meshes.push(instMesh(paint.length === 1 ? paint[0] : mergeGeometries(paint, false), paintMat, cap, true, true));
   if (rest.length) meshes.push(instMesh(rest.length === 1 ? rest[0] : mergeGeometries(rest, false), REST, cap, false, true));
-  return { meshes, n: 0, live: 0, cap, tinted: paint.length > 0 };
+  if (shirt.length) meshes.push(instMesh(shirt.length === 1 ? shirt[0] : mergeGeometries(shirt, false), shirtMat, cap, true, true));
+  return { meshes, n: 0, live: 0, cap, tinted: paint.length > 0, shirted: shirt.length > 0 };
 }
 
 // ---------- vehicles ----------
 const LIVE = [], POOL = [];
+// city buses pull in at the bus stand for a few seconds, in the kerb lane on its side; npc/routines.js has commuters get on and off
+let STOPS = null;
+const busStops = () => STOPS || (STOPS = (RF.bus_stops || []).map(b => { const [, i] = nearestOnMain(b.x, b.y), s = b.side === 'N' ? 1 : -1, off = asphHalf(i) - 1.4; return { x: MAINP[i][0] + NRM[i][0] * s * off, y: MAINP[i][1] + NRM[i][1] * s * off, name: b.name }; }));
 function makeVeh() {
   return { kind: 'hatch', route: MAIN, dir: 1, s: 0, i: 0, lat: 0, lane: 0, latOff: 0.8, speed: 0, vmax: 10, acc: 2.5, x: 0, y: 0, z: 0, heading: 0, cs: 1, sn: 0, tx: 1, ty: 0, hl: 2, hw: 0.9, col: CARS[0],
     ph: 0, wob: 0, hold: 0, honkCd: 0, brake: 0, laneCd: 0, per: 0, og: 1e9, turn: 0, dh: 0 };
@@ -124,7 +130,9 @@ function spaceFree(R, dir, s, latT) {
   for (let j = 0; j < LIVE.length; j++) { const o = LIVE[j]; if (o.route !== R || o.dir !== dir) continue; if (Math.abs(o.s - s) < 22 && Math.abs(o.lat - latT) < 2.2) return false; }
   return true;
 }
+let busDue = 20; // the city buses keep a rough timetable: every 35-60 s one of the main-road spawns is a bus
 function takeKind(lane) {
+  if (!lane && busDue <= 0 && KS.bus.live < KS.bus.cap) { busDue = 35 + Math.random() * 25; return 'bus'; }
   for (let tries = 0; tries < 6; tries++) {
     let kind;
     if (lane) kind = Math.random() < 0.8 ? (Math.random() < 0.6 ? 'scooter' : 'moto') : 'toto';
@@ -140,7 +148,7 @@ function spawn(R, dir, s, kind) {
   v.lane = R.main ? (kind === 'hatch' || kind === 'sedan' || kind === 'suv' ? (Math.random() < 0.65 ? 0 : 1) : (two && Math.random() < 0.15 ? 0 : 1)) : 0;
   v.latOff = kind === 'toto' ? 0.55 : 0.8;
   v.vmax = (R.main ? rand(kd.v[0], kd.v[1]) : (two ? rand(6, 8) : rand(4.5, 5.5))); v.acc = kd.acc;
-  v.hl = sz[0] / 2; v.hw = sz[1] / 2; v.col = kd.cols[Math.floor(Math.random() * kd.cols.length)];
+  v.hl = sz[0] / 2; v.hw = sz[1] / 2; v.col = kd.cols[Math.floor(Math.random() * kd.cols.length)]; v.col2 = SHIRTS[Math.floor(Math.random() * SHIRTS.length)];
   v.lat = laneTarget(v);
   if (!spaceFree(R, dir, v.s, v.lat)) return false;
   POOL.pop(); v.speed = v.vmax * 0.8; v.ph = Math.random() * 6.28; v.wob = two ? 0.15 : 0; v.hold = 0; v.honkCd = Math.random() * 2; v.brake = 0; v.laneCd = 2 + Math.random() * 4; v.per = Math.random() * 0.15; v.og = 1e9; v.turn = 0; v.dh = 0;
@@ -174,6 +182,14 @@ function stepVeh(v, dt, P) {
   if (R.main) { const ax = Math.abs(v.x - HAT.x); if (ax < 35) tgt *= ax < 15 ? 0.4 : 0.4 + 0.6 * (ax - 15) / 20; }
   tgt = Math.min(tgt, Math.max(2.5, v.vmax * (1 - Math.min(1, Math.abs(v.dh) / 1.1))));
   if (v.turn > 0) tgt = Math.min(tgt, 2.5);
+  if (v.kind === 'bus' && R.main) { // ease in to the stop, wait with the door open, then pull away
+    if (v.dwell > 0) { v.dwell -= dt; tgt = 0; } else if ((v.stopCd = (v.stopCd || 0) - dt) <= 0) for (const st of busStops()) {
+      const dx = st.x - v.x, dy = st.y - v.y, d = dx * v.cs + dy * v.sn; // the door is about mid-bus
+      if (d < -1 || d > 30 || Math.abs(-dx * v.sn + dy * v.cs) > 2.2) continue;
+      tgt = Math.min(tgt, Math.sqrt(2 * 2.2 * Math.max(0, d - 0.5)) + 0.3);
+      if (d < 1.2) { v.dwell = 7; v.stopCd = 45; emit('bus:stopped', { x: v.x, y: v.y, stop: st }); sfx('airbrake', { x: v.x, y: v.y }); }
+    }
+  }
   // the vehicle ahead in this lane: keep a time gap
   let gap = 1e9, lead = null;
   for (let j = 0; j < LIVE.length; j++) {
@@ -240,6 +256,7 @@ function writeVeh(v) {
     a[o + 12] = v.x; a[o + 13] = v.z; a[o + 14] = -v.y; a[o + 15] = 1;
   }
   if (k.tinted) { const ca = k.meshes[0].instanceColor.array; ca[i * 3] = v.col.r; ca[i * 3 + 1] = v.col.g; ca[i * 3 + 2] = v.col.b; }
+  if (k.shirted) { const ca = k.meshes[k.meshes.length - 1].instanceColor.array; ca[i * 3] = v.col2.r; ca[i * 3 + 1] = v.col2.g; ca[i * 3 + 2] = v.col2.b; }
 }
 
 // ---------- public ----------
@@ -258,7 +275,7 @@ function initTraffic() {
 function updateTraffic(dt, player) {
   if (!ready || !player || !(dt > 0)) return;
   if (dt > 0.05) dt = 0.05;
-  T += dt; hitCd -= dt;
+  T += dt; hitCd -= dt; busDue -= dt;
   // where the player is along the main road, how far from it, and how fast they move (cheap, a few times a second)
   if ((projT -= dt) <= 0) {
     projT = 0.25; let best = 1e18, bi = 0;
