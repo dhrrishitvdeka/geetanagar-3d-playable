@@ -69,16 +69,18 @@ const isWorn = id => !!state.wear && state.wear.id === id;
 
 // resolves when the shop closes; a forced close (pause, day change) resolves it with null and changes nothing
 // owner / title: the person and the signboard, for the shop tables that several keepers share (the shopfronts)
-async function openShop(shopId, owner, title) {
+// off: a friend's discount (0.1, 0.2), see friends.js
+async function openShop(shopId, owner, title, off = 0) {
   const shop = SHOPS[shopId]; if (!shop) return;
-  const items = shop.items.filter(id => ITEMS[id]).map(id => ({ id, name: ITEMS[id].name, price: ITEMS[id].price, desc: ITEMS[id].desc }));
+  const cost = id => Math.max(1, Math.round(ITEMS[id].price * (1 - off)));
+  const items = shop.items.filter(id => ITEMS[id]).map(id => ({ id, name: ITEMS[id].name, price: cost(id), desc: ITEMS[id].desc }));
   const onBuy = id => {
     const it = ITEMS[id]; if (!it || !shop.items.includes(id)) return 'Not sold here';
-    if (!spend(it.price)) return 'Not enough money';
-    addItem(id, 1); emit('shop:bought', { shopId, id, price: it.price }); sfx('coin');
+    if (!spend(cost(id))) return 'Not enough money';
+    addItem(id, 1); emit('shop:bought', { shopId, id, price: cost(id) }); sfx('coin');
     return true;
   };
-  try { await showShop({ title: title || shop.name, subtitle: `Run by ${owner || shop.owner}`, items, onBuy }); } catch (err) { console.error('[shop]', err); }
+  try { await showShop({ title: title || shop.name, subtitle: `Run by ${owner || shop.owner}` + (off ? `, who gives you ${Math.round(off * 100)}% off as a friend` : ''), items, onBuy }); } catch (err) { console.error('[shop]', err); }
 }
 
 // put an outfit on, or take it off again (back to your own look); it stays in the bag either way

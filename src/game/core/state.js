@@ -10,6 +10,7 @@ const fresh = () => ({
   money: 50, inv: {}, quests: {}, flags: {}, collected: [], discovered: [],
   stats: { distance: 0, goals: 0, deliveries: 0, photos: 0, talks: 0 },
   time: 7.0, day: 1, player: null, look: null, wear: null, // wear: the outfit put on over the look ({ id, ...appearance }), see items.js
+  friends: {}, // id -> how well that person knows you, see friends.js
 });
 function loadSettings() {
   try { return { ...DEFAULT_SETTINGS, ...JSON.parse(localStorage.getItem(SKEY) || '{}') }; } catch (e) { return { ...DEFAULT_SETTINGS }; }

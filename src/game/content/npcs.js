@@ -6,6 +6,7 @@ import { findOpen } from '../../ui/controls.js';
 import { spawnNPC } from '../npc/agents.js';
 import { isUIBlocking, showDialogue } from '../hud.js';
 import { openShop } from '../items.js';
+import { discountFor, noteTalk } from '../friends.js';
 
 // ---------- the named people of Geetanagar: where they stand, how they look, what they say ----------
 // Positions are worked out from the same helpers the world builders use, then nudged onto walkable ground at spawn time
@@ -131,7 +132,7 @@ async function shopTalk(npc, o = {}) {
   const shop = (npc.def && npc.def.shop) || (BY_ID[npc.id] && BY_ID[npc.id].shop);
   const choices = [...(shop ? [{ text: 'Buy something', value: 'buy' }] : []), ...(o.extras || []), { text: 'Chat', value: 'chat' }, { text: 'Bye', value: 'bye' }];
   const v = await ask(npc, o.greet || (BY_ID[npc.id] && BY_ID[npc.id].greet) || (npc.def && npc.def.greet) || 'Ki khobor? What can I do for you?', choices);
-  if (v === 'buy') { await openShop(shop, npc.def && npc.def.shopTitle ? npc.name : undefined, npc.def && npc.def.shopTitle); return 'buy'; }
+  if (v === 'buy') { await openShop(shop, npc.def && npc.def.shopTitle ? npc.name : undefined, npc.def && npc.def.shopTitle, discountFor(npc.id)); return 'buy'; }
   if (v === 'chat') { await chat(npc); return 'chat'; }
   return v == null ? 'bye' : v;
 }
@@ -139,6 +140,7 @@ async function shopTalk(npc, o = {}) {
 const TALK = {};
 async function talk(npc) {
   try {
+    await noteTalk(npc); // the day's hello, a present from a close friend, the chance to give them something (friends.js)
     const h = TALK[npc.id];
     if (h) return await h(npc);
     const d = BY_ID[npc.id];

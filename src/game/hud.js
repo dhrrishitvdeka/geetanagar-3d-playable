@@ -12,6 +12,7 @@ import { ITEMS, isWorn, useItem } from './items.js';
 import { isFullMapOpen } from './map.js';
 import { setVolume, sfx } from './audio.js';
 import { getDelivery } from './worldobjects.js';
+import { peopleList } from './friends.js';
 
 // ---------- Geetanagar game HUD: status, tracker, prompts, dialogue, shop, menus, toasts, markers, fades ----------
 // Everything is plain DOM inside #hud (styles in game.css). Dynamic text always goes through textContent.
@@ -736,6 +737,18 @@ function renderJournal(card) {
       sec.appendChild(c);
     }
     body.appendChild(sec);
+  }
+  // people: everyone you have talked to, how well they know you, and (once you have found out) what they like
+  let people = []; try { people = peopleList(); } catch (e) { people = []; }
+  if (people.length) {
+    const sec = el('section', 'g-jsec'); sec.appendChild(el('h3', null, 'People (' + people.length + ')'));
+    const ul = el('ul', 'g-people');
+    for (const f of people) {
+      const li = el('li'), dots = el('span', 'g-bond', '●'.repeat(f.level) + '○'.repeat(3 - f.level)); dots.title = f.label;
+      put(li, el('b', null, f.name), el('span', 'g-sub', f.title || ''), dots, el('em', null, f.label + (f.likes && f.likes.length ? ' · likes ' + f.likes.join(', ').toLowerCase() : '')));
+      ul.appendChild(li);
+    }
+    sec.appendChild(ul); body.appendChild(sec);
   }
   const s = state.stats || {}, gam = state.collected.filter(id => /gamosa/i.test(id)).length || state.collected.length;
   const stats = el('section', 'g-jsec'); stats.appendChild(el('h3', null, 'Stats'));
