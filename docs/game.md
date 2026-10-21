@@ -67,6 +67,10 @@ note it in your report rather than reaching into someone else's file.
 
 ## Boot order (src/game/main.js)
 
+Performance checks: `game.html?fps` shows fps, the slowest recent frame, the GPU the browser gave WebGL (on a two-GPU laptop:
+integrated or dedicated), the preset and the dynamic resolution. `(await import('/src/dev/gpubench.js')).bench()` in the dev
+console times the scene and shadow passes on the GPU at three fixed spots and counts what each draws.
+
 1. Same world build as the explorer (`src/main.js`), then `mergeStatic(scene)`.
 2. `enterWalk('field')` from `ui/controls.js`: puts the shared modules (grass, labels, terrace) in walking mode. From
    then on `player` from `ui/controls.js` is kept in sync by `player.js` (`x`, `y` = character, `yaw`/`pitch` = camera).

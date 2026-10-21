@@ -31,6 +31,7 @@ import { initAnimals, updateAnimals } from './animals.js';
 import { initTraffic, updateTraffic } from './traffic.js';
 import { initWorldObjects, takePhoto, updateWorldObjects } from './worldobjects.js';
 import { initLoose, updateLoose } from './loose.js';
+import './perfhud.js'; // game.html?fps shows a frame-rate readout
 import { initQuests, updateQuests } from './quests.js';
 import { tryInteract, updateInteract } from './interact.js';
 import { bigMessage, closeModals, fade, getOpenMenu, initHUD, isUIBlocking, setLoading, showMenu, updateHUD } from './hud.js';

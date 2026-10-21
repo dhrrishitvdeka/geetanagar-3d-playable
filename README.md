@@ -28,7 +28,7 @@ npm run build      # static build in dist/
 
 ## Game
 
-A third-person game on the same map lives at `game.html` (`http://localhost:5173/game.html` while the dev server runs; `run.bat` opens it directly, and the explorer's title card links to it). Add `?autostart` to the address to skip the title menu.
+A third-person game on the same map lives at `game.html` (`http://localhost:5173/game.html` while the dev server runs; `run.bat` opens it directly, and the explorer's title card links to it). Add `?autostart` to the address to skip the title menu. Add `?fps` for a frame-rate readout that also names the GPU in use.
 
 | Keys | Action |
 |---|---|
