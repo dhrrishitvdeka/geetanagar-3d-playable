@@ -27,6 +27,42 @@ const CONCRETE = new THREE.Color('#a8a49b'), REBAR = new THREE.Color('#4a3b30'),
 const BLD = [], SHOPLIST = [], tanks = [], ROOFS = []; // ROOFS: the flat roofs, for the clutter in details.js
 const C = (hex) => new THREE.Color(hex);
 
+// everything about a building that does not depend on its neighbours: floors, heights, roof type, style, colours
+function massing(b, bi) {
+  const ov = OVERRIDES[bi] || {};
+  const raw = b.p; if (raw.length < 3) return null;
+  let base = Infinity, top = -Infinity;
+  for (const p of raw) { const h = hAt(p[0], p[1]); base = Math.min(base, h); top = Math.max(top, h); }
+  const s = hash2(b.c[0] * 0.37, b.c[1] * 0.71), s2 = hash2(b.c[1] * 1.3, b.c[0] * 0.9), s3 = hash2(b.c[0] * 2.1 + 5, b.c[1] * 0.3);
+  let floors;
+  const a = b.a;
+  // Geetanagar is mostly 1-3 storey houses; taller apartment blocks cluster on Mother Teresa Rd
+  if (a < 45) floors = 1;
+  else if (a < 100) floors = s < 0.45 ? 1 : 2;
+  else if (a < 220) floors = s < 0.2 ? 1 : s < 0.75 ? 2 : 3;
+  else if (a < 600) floors = s < 0.35 ? 2 : s < 0.8 ? 3 : 4;
+  else floors = s < 0.55 ? 2 : 3; // very large blobs are usually several joined houses on the map
+  if (b.d < 30 && a > 120) floors = Math.max(floors, 3 + Math.floor(s2 * 4)); // Street View (Mar 2026): 3-6 storey flats line Mother Teresa Rd
+  else if (b.d < 22 && a > 80 && s2 < 0.55) floors += s2 < 0.2 ? 2 : 1;
+  if (b.k) floors = Math.max(floors, 2);
+  if (ov.floors) floors = ov.floors;
+  const lst = LANDMARK_STYLE.get(b);
+  if (lst && !ov.floors) { if (lst.kind === 'namghar' || lst.kind === 'temple') floors = 1; if (lst.kind === 'school') floors = Math.max(2, Math.min(floors, 3)); if (lst.kind === 'bank') floors = Math.max(floors, 2); }
+  // View point sightline: cap floors so the view stays open. Real houses that would still poke into it are kept
+  // at one storey (satellite shows them) rather than dropped, and get no roof tank.
+  let lowSight = false;
+  const vw = inViewWedge(b.c[0], b.c[1]); if (vw !== null) { const allowed = Math.floor((sightTop(vw) - top - 0.9) / 3.1); lowSight = allowed < 1; floors = Math.max(1, Math.min(floors, allowed)); }
+  floors = Math.min(floors, 8);
+  const z0 = base - 1.5, z1 = top + floors * FLOOR;
+  const isTin = ov.roof ? ov.roof === 'tin' : lst ? lst.kind === 'namghar' : (floors === 1 || (floors === 2 && a < 140 && s2 < 0.4));
+  const style = ov.style || (isTin ? 'assam' : lst ? { school: 'rcc', bank: 'slide', temple: 'blank' }[lst.kind] || 'rcc' : s3 < 0.55 ? 'rcc' : 'slide');
+  const wallCol = C(ov.wall ? ov.wall : lst ? LCOL[lst.kind] : isTin ? ASSAM_WALLS[Math.floor(s * 997) % ASSAM_WALLS.length] : b.k ? SHOP_WALLS[Math.floor(s2 * SHOP_WALLS.length)] : WALLS[Math.floor(s * 997) % WALLS.length]);
+  const tv = hash2(s2 * 9, s * 7); // trim: same paint, off-white bands, or a darker shade
+  const trimCol = tv < 0.5 ? wallCol.clone().multiplyScalar(0.93) : tv < 0.75 ? C('#e8e4da') : wallCol.clone().multiplyScalar(0.76);
+  const unfinished = ov.unfinished != null ? ov.unfinished : !isTin && !lst && floors >= 2 && vw === null && s3 > 0.965 && b.d > 40;
+  return { ov, raw, base, top, s, s2, s3, floors, a, lst, lowSight, vw, z0, z1, isTin, style, wallCol, trimCol, unfinished, pts: simplifyRing(raw, 0.85) };
+}
+
 function buildAll() {
   const FM = facadeMaterials();
   const W = { rcc: new MeshBuilder(), slide: new MeshBuilder(), assam: new MeshBuilder(), blank: new MeshBuilder() };
@@ -40,39 +76,16 @@ function buildAll() {
       [[uOff, v(z0)], [u1, v(z0)], [u1, v(z1)], [uOff, v(z1)]], [z0 - gA, z0 - gB, z1 - gB, z1 - gA]);
   };
 
+  // pass 1: every building's roof height, so a side wall knows how much of it the neighbour hides
+  const MS = GEO.buildings.map((b, bi) => massing(b, bi));
+  const NBG = new Map(), NBC = 16, nbk = (i, j) => i * 65536 + j;
+  MS.forEach((m, bi) => { if (!m) return; let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const p of m.pts) { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); }
+    for (let i = Math.floor(x0 / NBC); i <= Math.floor(x1 / NBC); i++) for (let j = Math.floor(y0 / NBC); j <= Math.floor(y1 / NBC); j++) { const k = nbk(i, j); (NBG.get(k) || NBG.set(k, []).get(k)).push(bi); } });
+  const roofAt = (x, y, self) => { const l = NBG.get(nbk(Math.floor(x / NBC), Math.floor(y / NBC))); if (l) for (const bi of l) if (bi !== self && pointInPoly(x, y, MS[bi].pts)) return MS[bi].z1; return null; };
+
   GEO.buildings.forEach((b, bi) => {
-    const ov = OVERRIDES[bi] || {};
-    const raw = b.p; if (raw.length < 3) return;
-    let base = Infinity, top = -Infinity;
-    for (const p of raw) { const h = hAt(p[0], p[1]); base = Math.min(base, h); top = Math.max(top, h); }
-    const s = hash2(b.c[0] * 0.37, b.c[1] * 0.71), s2 = hash2(b.c[1] * 1.3, b.c[0] * 0.9), s3 = hash2(b.c[0] * 2.1 + 5, b.c[1] * 0.3);
-    let floors;
-    const a = b.a;
-    // Geetanagar is mostly 1-3 storey houses; taller apartment blocks cluster on Mother Teresa Rd
-    if (a < 45) floors = 1;
-    else if (a < 100) floors = s < 0.45 ? 1 : 2;
-    else if (a < 220) floors = s < 0.2 ? 1 : s < 0.75 ? 2 : 3;
-    else if (a < 600) floors = s < 0.35 ? 2 : s < 0.8 ? 3 : 4;
-    else floors = s < 0.55 ? 2 : 3; // very large blobs are usually several joined houses on the map
-    if (b.d < 30 && a > 120) floors = Math.max(floors, 3 + Math.floor(s2 * 4)); // Street View (Mar 2026): 3-6 storey flats line Mother Teresa Rd
-    else if (b.d < 22 && a > 80 && s2 < 0.55) floors += s2 < 0.2 ? 2 : 1;
-    if (b.k) floors = Math.max(floors, 2);
-    if (ov.floors) floors = ov.floors;
-    const lst = LANDMARK_STYLE.get(b);
-    if (lst && !ov.floors) { if (lst.kind === 'namghar' || lst.kind === 'temple') floors = 1; if (lst.kind === 'school') floors = Math.max(2, Math.min(floors, 3)); if (lst.kind === 'bank') floors = Math.max(floors, 2); }
-    // View point sightline: cap floors so the view stays open. Real houses that would still poke into it are kept
-    // at one storey (satellite shows them) rather than dropped, and get no roof tank.
-    let lowSight = false;
-    const vw = inViewWedge(b.c[0], b.c[1]); if (vw !== null) { const allowed = Math.floor((sightTop(vw) - top - 0.9) / 3.1); lowSight = allowed < 1; floors = Math.max(1, Math.min(floors, allowed)); }
-    floors = Math.min(floors, 8);
-    const z0 = base - 1.5, z1 = top + floors * FLOOR;
-    const isTin = ov.roof ? ov.roof === 'tin' : lst ? lst.kind === 'namghar' : (floors === 1 || (floors === 2 && a < 140 && s2 < 0.4));
-    const style = ov.style || (isTin ? 'assam' : lst ? { school: 'rcc', bank: 'slide', temple: 'blank' }[lst.kind] || 'rcc' : s3 < 0.55 ? 'rcc' : 'slide');
-    const wallCol = C(ov.wall ? ov.wall : lst ? LCOL[lst.kind] : isTin ? ASSAM_WALLS[Math.floor(s * 997) % ASSAM_WALLS.length] : b.k ? SHOP_WALLS[Math.floor(s2 * SHOP_WALLS.length)] : WALLS[Math.floor(s * 997) % WALLS.length]);
-    const tv = hash2(s2 * 9, s * 7); // trim: same paint, off-white bands, or a darker shade
-    const trimCol = tv < 0.5 ? wallCol.clone().multiplyScalar(0.93) : tv < 0.75 ? C('#e8e4da') : wallCol.clone().multiplyScalar(0.76);
-    const unfinished = ov.unfinished != null ? ov.unfinished : !isTin && !lst && floors >= 2 && vw === null && s3 > 0.965 && b.d > 40;
-    const pts = simplifyRing(raw, 0.85);
+    const m = MS[bi]; if (!m) return; const { ov, raw, base, top, s, s2, s3, floors, a, lst, lowSight, vw, z0, z1, isTin, style, wallCol, trimCol, unfinished, pts } = m;
     const n = pts.length;
 
     // ---- per-edge facts ----
@@ -90,19 +103,23 @@ function buildAll() {
       E.push(e); if (L > E[longest].L) longest = i;
     }
     for (let i = 0; i < n; i++) {
-      const e = E[i], h = hash2(e.p[0] * 1.7 + i, e.p[1] * 2.3);
-      // side walls hard against a neighbour stay blank; everything else gets windows
-      const mx = (e.p[0] + e.q[0]) / 2, my = (e.p[1] + e.q[1]) / 2, nb = d => { const k = clsAt(mx + e.n[0] * d, my + e.n[1] * d); return k === 2 || k === 3; };
+      const e = E[i], mx = (e.p[0] + e.q[0]) / 2, my = (e.p[1] + e.q[1]) / 2, nb = d => { const k = clsAt(mx + e.n[0] * d, my + e.n[1] * d); return k === 2 || k === 3; };
       const party = !e.road && nb(3.0) && nb(4.2);
-      e.win = style === 'blank' ? false : style === 'assam' ? e.L >= 2.0 && !party && h < 0.85 : e.L >= 2.2 && (e.road || i === longest || (!party && h < 0.9));
+      // a neighbour hides this wall only up to its own roof; above that the wall is exposed and gets windows like any other
+      let hid = party ? roofAt(mx + e.n[0] * 3.6, my + e.n[1] * 3.6, bi) : null; if (party && hid === null) hid = z1;
+      e.hid = hid === null ? -Infinity : Math.min(z1, hid + 0.3);
+      e.front = e.road || i === longest;
+      e.win = style !== 'blank' && e.L >= (style === 'assam' ? 2.0 : 2.2) && z1 - Math.max(e.hid, top) >= 2.4;
     }
 
     // ---- walls: plinth band below the ground floor, then the facade ----
     const vOff = s2 < 0.5 ? 0 : 0.5;
     for (let i = 0; i < n; i++) {
-      const e = E[i], uOff = hash2(i + 3.3, s) < 0.5 ? 0 : 0.5, plinthTop = top + (isTin ? 0.45 : 0);
+      const e = E[i], uOff = hash2(i + 3.3, s) < 0.5 ? 0 : 0.5, plinthTop = top + (isTin ? 0.45 : 0), zWin = Math.max(plinthTop, e.hid);
+      const Wf = !e.win ? W.blank : (e.front || style === 'assam') ? W[style] : (W.side || W[style]); // W.side arrives in M3
       wall(W.blank, e.p, e.q, e.n, z0, plinthTop, wallCol.clone().multiplyScalar(isTin ? 0.8 : 0.92), top, uOff, vOff, e.gA, e.gB);
-      wall(e.win ? W[style] : W.blank, e.p, e.q, e.n, plinthTop, z1, wallCol, top, uOff, isTin ? 0 : vOff, e.gA, e.gB);
+      if (zWin > plinthTop) wall(W.blank, e.p, e.q, e.n, plinthTop, zWin, wallCol, top, uOff, vOff, e.gA, e.gB); // hidden by the neighbour
+      if (z1 > zWin) wall(Wf, e.p, e.q, e.n, zWin, z1, wallCol, top, uOff, isTin ? 0 : vOff, e.gA, e.gB);
     }
 
     // ---- RCC frame details: slab ledges, chajjas over every window row, balconies ----
@@ -117,12 +134,13 @@ function buildAll() {
           // floor slab edge at the top of every storey
           trim.box(e.p, e.u, e.n, -0.04, e.L + 0.04, -0.02, 0.09, fb + FLOOR - 0.2, fb + FLOOR, trimCol, 'f', g);
           // chajja (sunshade) over the window row
-          if (e.win && !(e.shop && k === 0)) trim.box(e.p, e.u, e.n, 0.15, e.L - 0.15, -0.02, 0.42 + s * 0.16, fb + 2.15, fb + 2.24, trimCol, 'ftu', g);
+          if (e.win && !(e.shop && k === 0) && fb + 2.15 > e.hid) trim.box(e.p, e.u, e.n, 0.15, e.L - 0.15, -0.02, 0.42 + s * 0.16, fb + 2.15, fb + 2.24, trimCol, 'ftu', g);
         }
         // balconies on road-facing walls of 2+ storey houses
         if (balcony && e.win && e.L >= 4 && (e.road || hash2(i * 7.1, s2) < 0.35)) {
           const bw = Math.min(e.L - 1, 3 + hash2(i, s2) * 3.5), a0 = (e.L - bw) * (hash2(s, i + 7) < 0.5 ? 0.5 : 0.15), a1 = a0 + bw, dep = 1.05;
           for (let k = 1; k < floors; k++) {
+            if (top + k * FLOOR < e.hid) continue;
             if (e.shop && k === 1) continue;
             const fb = top + k * FLOOR;
             trim.box(e.p, e.u, e.n, a0, a1, -0.02, dep, fb - 0.16, fb + 0.02, trimCol, 'ftulr', g);
@@ -146,6 +164,7 @@ function buildAll() {
           const cand = E.filter(e => e.win && e.L >= 3); if (!cand.length) break;
           const e = cand[Math.floor(R() * cand.length)], bays = Math.max(1, Math.round(e.L / BAY)), k = Math.floor(R() * floors);
           const al = bays > 1 ? (1 + Math.floor(R() * (bays - 1))) * e.L / bays : e.L * 0.18, fb = top + k * FLOOR;
+          if (fb + 1.1 < e.hid) continue;
           if (e.shop && k === 0) continue;
           trim.box(e.p, e.u, e.n, al - 0.42, al + 0.42, 0.03, 0.33, fb + 1.1, fb + 1.68, AC, 'ftulr', Math.min(e.gA, e.gB));
           trim.box(e.p, e.u, e.n, al - 0.3, al + 0.3, 0.33, 0.34, fb + 1.2, fb + 1.58, C('#6f7376'), 'f');
