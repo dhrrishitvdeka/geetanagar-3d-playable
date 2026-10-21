@@ -166,7 +166,11 @@ on the instanced crowd.
 ### npc/agents.js (characters)
 `initNPCs()`, `updateNPCs(dt, player)`, `spawnNPC(def) -> npc`, `getNPC(id)`, `allNPCs()`,
 `npcBlocking(x, y, r = 0.45, ignoreId) -> npc | null`, `npcSay(id, text, ms)`, `npcSetBehavior(id, behavior, opts)`,
-`npcMoveTo(id, x, y, { run, onArrive })`, `npcFace(id, x, y)`, `removeNPC(id)`.
+`npcMoveTo(id, x, y, { run, onArrive })`, `npcFace(id, x, y)`, `removeNPC(id)`,
+`addSpot(x, y, fromHour, toHour, make, r = 200, when?)`: a place that fills with people while the player is within `r` m, the hour is in
+range and `when()` (if given) holds. `make(spot)` returns `[{ role, x, y, heading, behavior, fixed?, z?, name?, title?, appearance?, def? }]`:
+`fixed` stands them off walkable ground (behind a shop counter), `z` is their floor height, `appearance` goes over a random look and
+`def` joins the NPC's def (`onTalk`, `shop`, `greet`, `chat`...).
 NPC: `{ id, name, role, title, x, y, z, heading, speed, state, behavior, def, talking }`.
 def: `{ id, name, role, title?, x, y, heading?, appearance? (partial), seed?, behavior?: idle|wander|patrol|sit|vendor|
 play|follow|pace|football, anchor?: {x, y, r}, path?: [[x, y]], talk? (default true), onTalk?: async (npc) => void,
@@ -196,7 +200,12 @@ shows the prompt through `hud.setPrompt`), `tryInteract() -> bool`, `getFocused(
 
 ### items.js (gameplay)
 `ITEMS` (`{ id: { name, price, desc, use? } }`), `SHOPS` (`{ shopId: { name, owner, items: [id] } }`),
-`openShop(shopId) -> Promise`, `useItem(id) -> bool`.
+`openShop(shopId, owner?, title?) -> Promise`, `useItem(id) -> bool`.
+
+### content/shopkeepers.js (content)
+`initShopkeepers()` (called by quests.js), `nearestShop(signName, x, y) -> bay | null`. One keeper per open shopfront on Mother Teresa
+Rd, from `SHOP_BAYS` in world/shops.js (`{ row, name, tag, kind, sells, x, y, z, heading, fx, fy }`: the keeper's spot on the shop
+floor, the customer's spot `fx, fy` on the footpath). Shops whose sign matches a table in `SHOPS` sell through "Buy something".
 
 ### worldobjects.js (gameplay mechanics)
 `initWorldObjects()`, `updateWorldObjects(dt, player)`, `takePhoto()`, `setWorldMarker(id, { x, y, z?, color? })`,

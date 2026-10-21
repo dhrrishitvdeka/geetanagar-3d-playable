@@ -15,6 +15,7 @@ import { sfx } from './audio.js';
 import { addBuff } from './player.js';
 import { PLACES, PLACE_BY_ID } from './content/places.js';
 import { Aborted, BY_ID, FIELD_ANCHOR, FIELD_C, NAMED, TALK, ask, chat, say, sayAll, shopTalk, spawnNamedNPCs } from './content/npcs.js';
+import { initShopkeepers } from './content/shopkeepers.js';
 
 // ---------- quest engine ----------
 // state.quests[id] = { status: 'active' | 'done', step, data }. A quest is a list of steps; a step may have
@@ -551,6 +552,7 @@ let inited = false;
 function initQuests() {
   if (inited) return; inited = true;
   try { spawnNamedNPCs(); } catch (err) { console.error('[quests] spawnNamedNPCs failed', err); }
+  try { initShopkeepers(); } catch (err) { console.error('[quests] shopkeepers failed', err); }
   reg('dadu', talkDadu); reg('rinku', talkRinku); reg('moni', talkKid); reg('bablu', talkKid); reg('purohit', talkPurohit);
   reg('raju', talkRaju); reg('kakati', talkKakati); reg('anjali', talkAnjali); reg('dipen', talkDipen); reg('bahadur', talkBahadur);
   reg('khagen', talkKhagen); reg('bina', talkBina); reg('jonali', talkJonali);

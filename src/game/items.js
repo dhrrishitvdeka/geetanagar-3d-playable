@@ -32,6 +32,12 @@ const ITEMS = {
   biscuits: { name: 'Biscuits', price: 10, desc: 'A packet of glucose biscuits. Dogs will follow you for these.', hint: 'Better to keep these for a hungry dog.' },
   marigold: { name: 'Marigold garland', price: 20, desc: 'A fresh orange garland for a puja.', hint: 'Keep it for the puja.' },
   newspaper: { name: 'Newspaper', price: 5, desc: 'Today\'s paper. Light local reading.', use() { return `Headline: ${pickLine(HEADLINES)}`; }, ms: 6500 },
+  thali: { name: 'Fish thali', price: 60, desc: 'Rice, dal, aloo pitika and masor tenga, the sour fish curry. Full stamina, and you tire slowly for a long while.', use() { fill(); addBuff('stamina', 240); return 'Masor tenga, rice and a squeeze of lemon. You could walk to Hatigarh and back.'; } },
+  cake: { name: 'Cake slice', price: 25, desc: 'A soft slice of sponge cake with cream on top.', use() { eat(0.35); return 'Cream on your nose. Worth it.'; } },
+  mekhela_pat: { name: 'Pat mekhela sador', price: 150, desc: 'Ivory pat silk with green and red woven borders, and a green blouse.',
+    wear: { female: true, hairStyle: 'bun', topStyle: 'blouse', top: '#1f6a45', bottomStyle: 'mekhela', bottom: '#efe7d2', wrap: '#f2ebd8', motif: '#b3202e', gamosa: false, hat: null, bag: null, umbrella: null, phone: false, stick: null } },
+  dhoti_kurta: { name: 'Dhoti, kurta and japi', price: 120, desc: 'A cream kurta, a white dhoti, a gamosa round the neck and a japi hat. Bihu dress for the dhol players.',
+    wear: { female: false, hairStyle: 'short', topStyle: 'kurta', top: '#efe3c4', bottomStyle: 'dhoti', bottom: '#f4efe2', gamosa: true, hat: 'japi', wrap: null, bag: null, umbrella: null, phone: false, stick: null } },
   cash_bag: { name: 'Cash bag', price: 0, desc: 'Someone\'s bag of cash. Handle with care.', hint: 'This is not yours to open.' },
   parcel: { name: 'Parcel', price: 0, desc: 'A wrapped parcel waiting at somebody\'s door.', hint: 'Deliver it to the address.' },
 };
@@ -46,10 +52,19 @@ const SHOPS = {
   flower_cart: { name: 'Flower Cart', owner: 'Jonali', items: ['marigold'] },
   hatigarh_kiosk: { name: 'Hatigarh Kiosk', owner: 'the kiosk owner', items: ['biscuits', 'water', 'newspaper'] },
   sweets: { name: 'Hatigarh Sweet Stall', owner: 'the sweet seller', items: ['jalebi', 'pitha'] },
+  // the shopfronts on Mother Teresa Rd (content/shopkeepers.js): one table per kind of shop, the keeper's name comes with the visit
+  sweet_shop: { name: 'Sharma Sweets', owner: 'the shopkeeper', items: ['pitha', 'jalebi', 'samosa'] },
+  tea_shop: { name: 'Assam Tea Stall', owner: 'the shopkeeper', items: ['lal_sah', 'doodh_sah', 'samosa'] },
+  grocery: { name: 'General Store', owner: 'the shopkeeper', items: ['biscuits', 'water', 'banana'] },
+  books: { name: 'Pathak Book Stall', owner: 'the shopkeeper', items: ['newspaper'] },
+  fruit_shop: { name: 'Fresh Fruits', owner: 'the shopkeeper', items: ['banana', 'water'] },
+  bakery: { name: 'Bakery & Cakes', owner: 'the shopkeeper', items: ['cake', 'biscuits'] },
+  hotel: { name: 'Hotel', owner: 'the cook', items: ['thali', 'lal_sah'] },
 };
 
 // resolves when the shop closes; a forced close (pause, day change) resolves it with null and changes nothing
-async function openShop(shopId) {
+// owner / title: the person and the signboard, for the shop tables that several keepers share (the shopfronts)
+async function openShop(shopId, owner, title) {
   const shop = SHOPS[shopId]; if (!shop) return;
   const items = shop.items.filter(id => ITEMS[id]).map(id => ({ id, name: ITEMS[id].name, price: ITEMS[id].price, desc: ITEMS[id].desc }));
   const onBuy = id => {
@@ -58,7 +73,7 @@ async function openShop(shopId) {
     addItem(id, 1); emit('shop:bought', { shopId, id, price: it.price }); sfx('coin');
     return true;
   };
-  try { await showShop({ title: shop.name, subtitle: `Run by ${shop.owner}`, items, onBuy }); } catch (err) { console.error('[shop]', err); }
+  try { await showShop({ title: title || shop.name, subtitle: `Run by ${owner || shop.owner}`, items, onBuy }); } catch (err) { console.error('[shop]', err); }
 }
 
 function useItem(id) {

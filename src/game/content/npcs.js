@@ -126,8 +126,8 @@ async function chat(npc) { // rotates through the person's small talk
 async function shopTalk(npc, o = {}) {
   const shop = (npc.def && npc.def.shop) || (BY_ID[npc.id] && BY_ID[npc.id].shop);
   const choices = [...(shop ? [{ text: 'Buy something', value: 'buy' }] : []), ...(o.extras || []), { text: 'Chat', value: 'chat' }, { text: 'Bye', value: 'bye' }];
-  const v = await ask(npc, o.greet || (BY_ID[npc.id] && BY_ID[npc.id].greet) || 'Ki khobor? What can I do for you?', choices);
-  if (v === 'buy') { await openShop(shop); return 'buy'; }
+  const v = await ask(npc, o.greet || (BY_ID[npc.id] && BY_ID[npc.id].greet) || (npc.def && npc.def.greet) || 'Ki khobor? What can I do for you?', choices);
+  if (v === 'buy') { await openShop(shop, npc.def && npc.def.shopTitle ? npc.name : undefined, npc.def && npc.def.shopTitle); return 'buy'; }
   if (v === 'chat') { await chat(npc); return 'chat'; }
   return v == null ? 'bye' : v;
 }

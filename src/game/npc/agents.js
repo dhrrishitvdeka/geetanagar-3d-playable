@@ -154,7 +154,13 @@ function recycle(n) {
 }
 
 // ---------- fixed spots: vendors, sitters, chatting pairs, kids at play (appear when the player is within ~200 m) ----------
-function spot(x, y, h0, h1, make) { SPOTS.push({ x, y, h0, h1, make, npcs: [], active: false }); }
+// r: how near the player has to be for the spot to fill (the shopkeepers use a shorter reach than the default)
+function spot(x, y, h0, h1, make, r = SPAWN_R) { SPOTS.push({ x, y, h0, h1, make, r, npcs: [], active: false }); }
+// for the content modules: a place that fills with people while the player is near. make(sp) returns a list of
+// { role, x, y, heading, behavior, fixed?, z?, name?, title?, appearance?, def? }: fixed stands them where they are even off walkable
+// ground (behind a shop counter), z is their floor height, appearance is laid over a random look, def joins the NPC's def
+// (onTalk, shop...). when(): an extra condition, e.g. a quest step
+const addSpot = (x, y, h0, h1, make, r, when) => { spot(x, y, h0, h1, make, r); if (when) SPOTS[SPOTS.length - 1].when = when; };
 function buildSpots() {
   // Hatigarh stall row: every stall but the first (that one belongs to a named seller) has someone behind the counter
   for (let k = 1; k < 9; k++) spot(-489.3, -60.2 + k * 2.45, 6, 18.5, sp => [{ role: 'vendor', x: sp.x + 1.4, y: sp.y, heading: Math.PI, behavior: 'vendor' }]);
@@ -179,11 +185,11 @@ function buildSpots() {
 function activateSpot(sp) {
   sp.active = true;
   for (const c of sp.make(sp)) {
-    if (c.behavior !== 'sit' && !walkable(c.x, c.y)) continue; // never stand a person inside a stall or wall
-    const app = randomAppearance(Math.random, { role: c.role, kid: c.role === 'kid' ? true : undefined }); if (c.phone) app.phone = true;
+    if (c.behavior !== 'sit' && !c.fixed && !walkable(c.x, c.y)) continue; // never stand a person inside a stall or wall
+    const app = { ...randomAppearance(Math.random, { role: c.role, kid: c.role === 'kid' ? true : undefined, female: c.appearance ? c.appearance.female : undefined }), ...(c.appearance || {}) }; if (c.phone) app.phone = true;
     if (c.team !== undefined) { app.top = TEAM_TOP[c.team]; app.topStyle = 'tshirt'; app.bottomStyle = 'pants'; app.bag = app.umbrella = app.wrap = null; } // bibs: one team red, the other blue
-    const n = makeNPC('spot' + (ambSeq++), pickName(!!app.female), c.role, c.x, c.y, c.heading, app, { talk: true, behavior: c.behavior }, 'spot');
-    n.name = n.name || 'Local'; setLabel(n); n.spot = sp; n.behavior = c.behavior; n.anchor = c.anchor || null; n.idleState = c.floor ? 'floor' : c.behavior === 'sit' ? 'sit' : 'idle';
+    const n = makeNPC('spot' + (ambSeq++), c.name || pickName(!!app.female), c.role, c.x, c.y, c.heading, app, { talk: true, behavior: c.behavior, ...(c.def || {}) }, 'spot');
+    n.name = n.name || 'Local'; if (c.title) n.title = c.title; if (c.z !== undefined) { n.zFix = c.z; n.z = c.z; } setLabel(n); n.spot = sp; n.behavior = c.behavior; n.anchor = c.anchor || null; n.idleState = c.floor ? 'floor' : c.behavior === 'sit' ? 'sit' : 'idle';
     n.vWalk = rnd(1.0, 1.3); n.vRun = rnd(2.6, 3.4); sp.npcs.push(n); addToWorld(n);
     if (c.team !== undefined) { n.team = c.team; n.fpos = c.fpos; n.side = c.side; n.kickT = 0; n.cel = 0; FB.push(n); }
   }
@@ -191,9 +197,9 @@ function activateSpot(sp) {
 }
 function manageSpots() {
   for (const sp of SPOTS) {
-    const d = Math.hypot(sp.x - P.x, sp.y - P.y), open = hour >= sp.h0 && hour < sp.h1;
-    if (!sp.active && open && d < SPAWN_R) activateSpot(sp);
-    else if (sp.active && (!open || d > RECYCLE_R + 30)) { // drop in order without copying: dropFromWorld splices n out of sp.npcs, so only step on when n stayed (talking)
+    const d = Math.hypot(sp.x - P.x, sp.y - P.y), open = hour >= sp.h0 && hour < sp.h1 && (!sp.when || sp.when());
+    if (!sp.active && open && d < sp.r) activateSpot(sp);
+    else if (sp.active && (!open || d > sp.r + RECYCLE_R - SPAWN_R + 30)) { // drop in order without copying: dropFromWorld splices n out of sp.npcs, so only step on when n stayed (talking)
       const L = sp.npcs; for (let i = 0; i < L.length;) { const n = L[i]; if (!n.talking) dropFromWorld(n); if (L[i] === n) i++; }
       if (!sp.npcs.length) sp.active = false;
     }
@@ -520,7 +526,7 @@ function locomote(n, dt, cheap) {
   }
 }
 function stepNPC(n, dt, cheap) {
-  n.z = groundAt(n.x, n.y);
+  n.z = n.zFix !== undefined ? n.zFix : groundAt(n.x, n.y); // zFix: a shop floor above the street
   n.lookOn = false;
   if (n.talking) { if (P) { turnTo(n, Math.atan2(P.y - n.y, P.x - n.x), 6, dt); lookAtPlayer(n); } n.state = 'talk'; n.speed = 0; n.vx = n.vy = 0; return; }
   if (n.flinchT > 0) { n.flinchT -= dt; n.x += n.slideX * dt; n.y += n.slideY * dt; n.state = 'flinch'; n.speed = 0; return; }
@@ -664,4 +670,4 @@ function npcMoveTo(id, x, y, opts = {}) {
 function npcFace(id, x, y) { const n = BYID.get(id); if (!n) return; n.heading = Math.atan2(y - n.y, x - n.x); n.faceT = [x, y]; }
 function removeNPC(id) { const n = BYID.get(id); if (n) dropFromWorld(n); }
 
-export { initNPCs, updateNPCs, spawnNPC, getNPC, allNPCs, npcBlocking, npcSay, npcSetBehavior, npcMoveTo, npcFace, removeNPC };
+export { initNPCs, updateNPCs, spawnNPC, getNPC, allNPCs, npcBlocking, npcSay, npcSetBehavior, npcMoveTo, npcFace, removeNPC, addSpot };

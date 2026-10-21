@@ -129,9 +129,63 @@ const awningTex = canvasTex(512, 256, (g) => {
   const gr = g.createLinearGradient(0, 0, 0, 256); gr.addColorStop(0, 'rgba(0,0,0,0.15)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(0, 0, 512, 256);
 }, false);
 
+// ---------- what stands in an open shop: a counter on the raised step and goods that match the signboard ----------
+// kind of shop per signboard row (SHOP_NAMES), and which shop table (game/items.js SHOPS) its keeper sells from
+const KIND = { 0: 'grocery', 16: 'grocery', 14: 'ration', 1: 'medical', 17: 'medical', 25: 'medical', 12: 'medical', 2: 'sweets', 13: 'bakery', 3: 'cloth', 26: 'cloth', 31: 'cloth',
+  20: 'cloth', 4: 'hardware', 19: 'hardware', 18: 'hardware', 29: 'hardware', 5: 'paper', 22: 'paper', 10: 'paper', 28: 'paper', 6: 'electric', 7: 'electric', 21: 'electric', 23: 'electric',
+  27: 'electric', 8: 'fruit', 9: 'tea', 24: 'hotel', 30: 'hotel', 11: 'salon' };
+const SELLS = { 31: 'dresses', 2: 'sweet_shop', 9: 'tea_shop', 0: 'grocery', 16: 'grocery', 14: 'grocery', 22: 'books', 8: 'fruit_shop', 13: 'bakery', 24: 'hotel', 30: 'hotel' };
+// one entry per frontage with a fully open bay: where its keeper stands (behind the counter, on the shop floor) and where a customer stands
+const SHOP_BAYS = [];
+const SWEET = ['#f08a24', '#f4efe2', '#7a4a2a', '#f2a7b8', '#e6c34a', '#9c2f2f'], SILK = ['#d6b25e', '#efe7d2', '#8e1f2f', '#1f6a45', '#c9a24a', '#7a1c2c', '#2b5d8a'];
+const FRUIT = ['#f28c1e', '#f2d43a', '#6aa63a', '#c62828', '#8bc34a', '#e8a33a'], SACK = ['#f1ece0', '#e8c547', '#d9713a', '#c9a77a'], PACK = ['#d23b2f', '#f2c12e', '#2f8f4e', '#2a63b5', '#f07b22', '#e8457e', '#7a4fa0'];
+const _col = new Map(), C = hex => { let c = _col.get(hex); if (!c) _col.set(hex, c = new THREE.Color(hex)); return c; };
+// B(al0, al1, d0, d1, z0, z1, hex): a box in the frontage's frame (along the wall, out from it, height); foot: ground height out on the footpath
+function stockBay(kind, B, al0, al1, top, foot, r) {
+  const pick = a => a[Math.floor(r() * a.length)], w = al1 - al0, mid = (al0 + al1) / 2;
+  const counter = (hex, glass) => {
+    B(al0 + 0.2, al1 - 0.2, 0.42, 0.72, top, top + (glass ? 0.55 : 0.9), hex);
+    if (glass) { // a glass-topped case: a pale top sheet on four thin posts, what it shows sits on the base
+      B(al0 + 0.2, al1 - 0.2, 0.42, 0.72, top + 0.9, top + 0.92, '#cfe3e8');
+      for (const al of [al0 + 0.21, al1 - 0.23]) for (const d of [0.43, 0.69]) B(al, al + 0.02, d, d + 0.02, top + 0.55, top + 0.9, '#9aa4a8');
+    } else B(al0 + 0.18, al1 - 0.18, 0.4, 0.74, top + 0.9, top + 0.94, '#c9b48a'); // worn wooden top
+  };
+  const shelfRow = (z, cols, h) => { for (let x = al0 + 0.3; x < al1 - 0.35; x += 0.13 + r() * 0.06) { const hh = h * (0.6 + r() * 0.5); B(x, x + 0.09, 0.47 + r() * 0.08, 0.6 + r() * 0.08, z, z + hh, pick(cols)); } };
+  const strips = cols => { for (let x = al0 + 0.25, k = 0; x < al1 - 0.25; x += 0.28, k++) B(x, x + 0.16, 0.08, 0.1, top + 1.85, top + 2.55, cols[k % cols.length]); }; // sachet strips hanging in the doorway
+  const bench = () => { const z = foot(mid, 1.15); B(mid - 0.75, mid + 0.75, 1.0, 1.32, z + 0.4, z + 0.45, '#7a4c28'); for (const x of [mid - 0.65, mid + 0.6]) B(x, x + 0.05, 1.05, 1.27, z, z + 0.4, '#3a2a1a'); };
+  switch (kind) {
+    case 'grocery': counter('#8a6a48'); shelfRow(top + 0.94, PACK, 0.22); strips(PACK); break;
+    case 'ration': counter('#8a6a48'); for (let x = al0 + 0.25; x < al1 - 0.5; x += 0.55) { const z = foot(x + 0.25, 1.0), c = pick(SACK); B(x, x + 0.45, 0.82, 1.2, z, z + 0.5, '#d8cfb8'); B(x + 0.04, x + 0.41, 0.86, 1.16, z + 0.5, z + 0.56, c); } break;
+    case 'medical': counter('#d7dcde', true); shelfRow(top + 0.56, ['#f4f4f0', '#ffffff', '#e8eef2', '#2a63b5'], 0.14); B(al1 - 0.12, al1 - 0.04, 0.12, 0.16, top + 2.1, top + 2.5, '#2e9a4a'); B(al1 - 0.28, al1 + 0.12, 0.12, 0.16, top + 2.26, top + 2.34, '#2e9a4a'); break;
+    case 'sweets': case 'bakery': counter(kind === 'sweets' ? '#e9e2d0' : '#f3e6ea', true);
+      for (let x = al0 + 0.28; x < al1 - 0.4; x += 0.26) for (const d of [0.47, 0.58]) { B(x, x + 0.22, d, d + 0.1, top + 0.55, top + 0.58, '#b9bcbe'); for (let k = 0; k < 3; k++) B(x + 0.02 + k * 0.07, x + 0.07 + k * 0.07, d + 0.02, d + 0.08, top + 0.58, top + 0.62, pick(kind === 'sweets' ? SWEET : ['#f4efe2', '#f2a7b8', '#7a4a2a', '#e6c34a'])); }
+      break;
+    case 'cloth': counter('#7a5236');
+      for (let x = al0 + 0.3; x < al1 - 0.45; x += 0.34) { let z = top + 0.94; for (let k = 0; k < 3 + Math.floor(r() * 3); k++) { const t = 0.04 + r() * 0.02; B(x, x + 0.28, 0.46, 0.68, z, z + t, pick(SILK)); z += t; } } // folded silk
+      B(al0 + 0.15, al1 - 0.15, 0.1, 0.13, top + 2.22, top + 2.25, '#6f7375'); // garment rail, with what hangs from it
+      for (let x = al0 + 0.25; x < al1 - 0.3; x += 0.2) B(x, x + 0.16, 0.06, 0.18, top + 1.55 + r() * 0.15, top + 2.2, pick(SILK));
+      break;
+    case 'hardware': counter('#6d7f8c');
+      for (let x = al0 + 0.2; x < al1 - 0.4; x += 0.42) { const z = foot(x + 0.17, 0.95), c = pick(['#2a63b5', '#d23b2f', '#f2c12e', '#2f8f4e', '#ececec']); B(x, x + 0.34, 0.8, 1.1, z, z + 0.36, c); B(x + 0.03, x + 0.31, 0.83, 1.07, z + 0.36, z + 0.38, '#3a3f44'); }
+      for (let k = 0; k < 4; k++) { const x = al1 - 0.3 - k * 0.08; B(x, x + 0.05, 0.1, 0.16, top, top + 2.0, '#d0d4d6'); } // pipes stood against the wall
+      break;
+    case 'paper': counter('#8a6a48'); for (let x = al0 + 0.3; x < al1 - 0.4; x += 0.3) { let z = top + 0.94; for (let k = 0; k < 4; k++) { B(x, x + 0.24, 0.47, 0.66, z, z + 0.03, k % 2 ? '#f4f1e8' : pick(PACK)); z += 0.03; } } break;
+    case 'electric': counter('#2f3a44', true); for (let x = al0 + 0.3; x < al1 - 0.35; x += 0.14) B(x, x + 0.08, 0.5, 0.62, top + 0.55, top + 0.6, pick(['#111418', '#c9a227', '#e0e0e0', '#2a63b5'])); B(mid - 0.4, mid + 0.4, 0.04, 0.06, top + 1.6, top + 2.2, '#1565c0'); break;
+    case 'fruit': // tiered crates out to the edge of the step: fruit on top of each
+      for (const [d0, z] of [[0.15, 0.75], [0.36, 0.5], [0.56, 0.25]]) for (let x = al0 + 0.2; x < al1 - 0.4; x += 0.42) { B(x, x + 0.38, d0, d0 + 0.2, top, top + z, '#a0783c'); B(x + 0.02, x + 0.36, d0 + 0.02, d0 + 0.18, top + z, top + z + 0.06, pick(FRUIT)); }
+      break;
+    case 'tea': counter('#8a6a48'); B(al0 + 0.3, al0 + 0.55, 0.48, 0.66, top + 0.94, top + 1.22, '#9aa0a3'); B(al0 + 0.36, al0 + 0.49, 0.53, 0.61, top + 1.22, top + 1.27, '#3a3f44'); // kettle on its stove
+      for (let x = al0 + 0.7; x < al1 - 0.4; x += 0.09) B(x, x + 0.05, 0.6, 0.65, top + 0.94, top + 1.03, '#f4f4f0'); bench(); break;
+    case 'hotel': counter('#a0522d'); for (let x = al0 + 0.3; x < al1 - 0.5; x += 0.38) { B(x, x + 0.3, 0.45, 0.68, top + 0.94, top + 1.16, '#b8bec2'); B(x + 0.02, x + 0.28, 0.47, 0.66, top + 1.16, top + 1.18, '#6f7375'); } bench(); break;
+    case 'salon': B(mid - 0.3, mid + 0.3, 0.2, 0.6, top, top + 0.5, '#8e1f2f'); B(mid - 0.3, mid + 0.3, 0.15, 0.22, top + 0.5, top + 1.05, '#8e1f2f'); B(mid - 0.5, mid + 0.5, 0.04, 0.06, top + 1.1, top + 1.9, '#dfe9ee'); break;
+    default: counter('#8a6a48'); shelfRow(top + 0.94, PACK, 0.2);
+  }
+  return kind !== 'fruit' && kind !== 'salon'; // has a counter to stand behind
+}
+
 function buildShopfronts(list) {
   const FM = facadeMaterials();
-  const inter = new MeshBuilder(), shut = new MeshBuilder(), sign = new MeshBuilder(), awn = new MeshBuilder(), trim = new MeshBuilder();
+  const inter = new MeshBuilder(), shut = new MeshBuilder(), sign = new MeshBuilder(), awn = new MeshBuilder(), trim = new MeshBuilder(), goods = new MeshBuilder();
   const WHITE = new THREE.Color(1, 1, 1), GREY = new THREE.Color('#6f7375'), STEP = new THREE.Color('#a9a59c'), FRAME = new THREE.Color('#3c3f42');
   const tarp = ['#2f6fb3', '#2f6fb3', '#3f7fbf', '#2e7d32', '#c62828', '#d9a520', '#00838f', '#8b8f93'].map(c => new THREE.Color(c));
   let si = 0;
@@ -144,6 +198,11 @@ function buildShopfronts(list) {
       const bays = Math.max(1, Math.round(L / 3.4)), bw = L / bays, H = 2.75;
       const pc = b.wall.clone().multiplyScalar(0.9);
       const P = (al, d, z) => [a[0] + u[0] * al + n[0] * d, a[1] + u[1] * al + n[1] * d, z];
+      // the signboard row is decided here (it was at the end of the loop) so the bays know what they sell
+      let row = b.sign != null ? BANK_SIGN : si++ % 32; if (b.sign == null && row === BANK_SIGN) row = si++ % 32;
+      const kind = b.sign != null ? null : KIND[row] || 'general', r = rng(Math.floor(a[0] * 31 + a[1] * 17)); let keeperBay = false;
+      const B = (al0, al1, d0, d1, z0, z1, hex) => goods.box(a, u, n, al0, al1, d0, d1, z0, z1, C(hex), 'fbtulr', top);
+      const foot = (al, d) => hAt(a[0] + u[0] * al + n[0] * d, a[1] + u[1] * al + n[1] * d);
       // raised concrete step along the frontage, RCC pillars between the bays
       trim.box(a, u, n, 0, L, -0.02, 0.75, Math.min(gmin, top) - 0.4, top + 0.02, STEP, 'ftlr', gmin);
       for (let k = 0; k <= bays; k++) trim.box(a, u, n, k * bw - (k === 0 ? 0 : 0.17), k * bw + (k === bays ? 0 : 0.17), -0.02, 0.1, top, top + 2.98, pc, 'ftlr', top);
@@ -152,6 +211,14 @@ function buildShopfronts(list) {
         const hsh = hash2(a[0] + k * 3.7, a[1] - k), state = hsh < 0.5 ? 'open' : hsh < 0.8 ? 'half' : 'closed';
         const ic = Math.floor(hash2(k + 1.3, a[0]) * INTERIORS), sc = Math.floor(hash2(a[1], k + 2.1) * SHUTTERS);
         const iu0 = ic / 4, iu1 = (ic + 1) / 4, su0 = sc / 4, su1 = (sc + 1) / 4;
+        if (state === 'open' && kind) { // a counter and goods in every open bay; the first one gets the keeper
+          const hasCounter = stockBay(kind, B, al0, al1, top, foot, r), mid = (al0 + al1) / 2;
+          if (hasCounter) addCollider([P(al0 + 0.2, 0.74, 0)[0], P(al0 + 0.2, 0.74, 0)[1]], [P(al1 - 0.2, 0.74, 0)[0], P(al1 - 0.2, 0.74, 0)[1]]);
+          if (!keeperBay) {
+            keeperBay = true; const k = P(mid, hasCounter ? 0.22 : 0.3, 0), f = P(mid, 1.35, 0);
+            SHOP_BAYS.push({ row, name: SHOP_NAMES[row], tag: TAGS[row], kind, sells: SELLS[row] || null, x: k[0], y: k[1], z: top + 0.02, heading: Math.atan2(n[1], n[0]), fx: f[0], fy: f[1] });
+          }
+        }
         if (state !== 'closed') inter.quad(P(al0, 0.03, top), P(al1, 0.03, top), P(al1, 0.03, top + H), P(al0, 0.03, top + H), [n[0], n[1], 0], WHITE, [[iu0, 0.5], [iu1, 0.5], [iu1, 1], [iu0, 1]]);
         const f = state === 'open' ? 0.06 : state === 'half' ? 0.35 + (hsh - 0.5) * 1.2 : 1, zb = top + H * (1 - f);
         shut.quad(P(al0, 0.07, zb), P(al1, 0.07, zb), P(al1, 0.07, top + H), P(al0, 0.07, top + H), [n[0], n[1], 0], WHITE, [[su0, 0.5 - f * 0.5], [su1, 0.5 - f * 0.5], [su1, 0.5], [su0, 0.5]]);
@@ -167,7 +234,6 @@ function buildShopfronts(list) {
         }
       }
       // signboard: one flex board across the frontage, in a thin steel frame
-      let row = b.sign != null ? BANK_SIGN : si++ % 32; if (b.sign == null && row === BANK_SIGN) row = si++ % 32;
       const u0 = (row % 2) * 0.5, u1 = u0 + 0.5, v1 = 1 - Math.floor(row / 2) / 16, v0 = v1 - 1 / 16;
       const sh = Math.min(1.15, 0.85 + L * 0.02), z0 = top + 3.0, z1 = z0 + sh;
       sign.quad(P(0.1, 0.2, z0), P(L - 0.1, 0.2, z0), P(L - 0.1, 0.2, z1), P(0.1, 0.2, z1), [n[0], n[1], 0], WHITE, [[u0, v0], [u1, v0], [u1, v1], [u0, v1]]);
@@ -179,6 +245,7 @@ function buildShopfronts(list) {
   sign.mesh(new THREE.MeshStandardMaterial({ map: signAtlas, roughness: 0.55, emissive: '#ffffff', emissiveMap: signAtlas, emissiveIntensity: 0.12, side: THREE.DoubleSide }));
   awn.mesh(new THREE.MeshStandardMaterial({ map: awningTex, vertexColors: true, side: THREE.DoubleSide, roughness: 0.85 }));
   trim.mesh(FM.trim);
+  goods.mesh(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.75 }));
 }
 
-export { kioskTex, kiosk, buildKiosks, buildShopfronts, GOODS, SHOP_NAMES, SIGN_COLS, signAtlas, shopAtlas };
+export { kioskTex, kiosk, buildKiosks, buildShopfronts, GOODS, SHOP_NAMES, SIGN_COLS, signAtlas, shopAtlas, SHOP_BAYS };
