@@ -13,7 +13,7 @@ import { makeRealCharacter, realReady } from './realchars.js';
 const SLOTS = { low: 6, medium: 12, high: 16 }[QUALITY] || 12;
 const RANGE = 45, NAMED_RANGE = 70, KEEP = 10, EVERY = 0.25, CULL_R = 3.5, FAR = 25, FAR_DT = 0.05;
 const pool = [], selN = new Array(SLOTS).fill(null), selS = new Float32Array(SLOTS);
-const ANIM = { state: 'idle', speed: 0, seated: false, restart: false };
+const ANIM = { state: 'idle', speed: 0, seated: false, restart: false, look: NaN, lookP: 0 };
 const frustum = new THREE.Frustum(), vp = new THREE.Matrix4(), sph = new THREE.Sphere();
 let built = false, off = false, timer = 0, stamp = 0;
 
@@ -69,6 +69,10 @@ function updateRealPool(list, count, dt) {
       if (!vis) { s.acc = 0; continue; }
       s.acc += dt; if (d2 > near2 && s.acc < FAR_DT) continue; // distant people animate at ~20 Hz
       ANIM.state = n.state; ANIM.speed = n.speed; ANIM.seated = n.behavior === 'sit' && !n.goto;
+      if (n.state === 'idle' && Math.abs(n.hv || 0) > 1.1) { ANIM.state = 'walk'; ANIM.speed = 0.7; } // turning on the spot: shuffle the feet round instead of spinning on them
+      ANIM.look = NaN; // head target as yaw relative to the body (+ = to the left) and pitch (+ = up); NaN = no target, the idle glances run
+      if (n.lookOn) { const lx = n.lookX - n.x, ly = n.lookY - n.y, rel = Math.atan2(Math.sin(Math.atan2(ly, lx) - n.heading), Math.cos(Math.atan2(ly, lx) - n.heading));
+        if (Math.abs(rel) < 1.9) { ANIM.look = rel; ANIM.lookP = Math.atan2(n.lookZ - (n.z + 1.55 * n.recipe.s), Math.hypot(lx, ly) + 0.3); } }
       s.ch.animate(Math.min(s.acc, 0.1), ANIM); s.acc = 0;
     }
   } catch (e) {

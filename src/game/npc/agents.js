@@ -506,7 +506,7 @@ function locomote(n, dt, cheap) {
 function stepNPC(n, dt, cheap) {
   n.z = groundAt(n.x, n.y);
   n.lookOn = false;
-  if (n.talking) { if (P) turnTo(n, Math.atan2(P.y - n.y, P.x - n.x), 6, dt); n.state = 'talk'; n.speed = 0; n.vx = n.vy = 0; return; }
+  if (n.talking) { if (P) { turnTo(n, Math.atan2(P.y - n.y, P.x - n.x), 6, dt); lookAtPlayer(n); } n.state = 'talk'; n.speed = 0; n.vx = n.vy = 0; return; }
   if (n.flinchT > 0) { n.flinchT -= dt; n.x += n.slideX * dt; n.y += n.slideY * dt; n.state = 'flinch'; n.speed = 0; return; }
   if (n.bumpCd > 0) n.bumpCd -= dt; if (n.greetCd > 0) n.greetCd -= dt; if (n.sayCd > 0) n.sayCd -= dt;
   W.go = false;
@@ -518,9 +518,15 @@ function stepNPC(n, dt, cheap) {
   }
   locomote(n, dt, cheap);
   if (n.kickT > 0 || n.cel > 0) n.state = n.idleState; // kick, throw-in, celebration: the pose holds even while still sliding to a stop
+  if (!n.lookOn && !cheap) glance(n);
 }
-// footballers note what they watch (lookOn / lookX / lookY / lookZ); nothing turns a head yet
+// where the head turns (realpool.js reads lookOn / lookX / lookY / lookZ): someone close by with the player in front of them
+// notices the player; people stopped for a word look at each other. The body keeps its heading, only the head and neck follow.
 function lookAtPlayer(n) { n.lookOn = true; n.lookX = P.x; n.lookY = P.y; n.lookZ = (P.z || 0) + 1.55; }
+function glance(n) {
+  if (P && n.state !== 'run') { const dx = P.x - n.x, dy = P.y - n.y, d2 = dx * dx + dy * dy; if (d2 < 49 && dx * Math.cos(n.heading) + dy * Math.sin(n.heading) > -0.3 * Math.sqrt(d2)) { lookAtPlayer(n); return; } }
+  const o = n.partner || n.mate; if (o && !o.dead && Math.hypot(o.x - n.x, o.y - n.y) < 3) { n.lookOn = true; n.lookX = o.x; n.lookY = o.y; n.lookZ = o.z + 1.5 * o.recipe.s; }
+}
 
 // ---------- speech and talking ----------
 function say(n, text, ms = 3200) { bubble('npc:' + n.id, n._hfn, text, ms); }

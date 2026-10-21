@@ -168,7 +168,8 @@ def: `{ id, name, role, title?, x, y, heading?, appearance? (partial), seed?, be
 play|follow|pace|football, anchor?: {x, y, r}, path?: [[x, y]], talk? (default true), onTalk?: async (npc) => void,
 lines?: [string] }`. Every NPC with `talk !== false` gets an interactable (`npc:<id>`); talking stops it, turns it to
 the player, emits `npc:talk`, then runs `def.onTalk(npc)` or a random line from `def.lines` / the ambient pool.
-The field's kids are a 3-a-side match (`behavior: 'football'`, `team` 0/1, `fpos` keep/def/att; team 0 attacks
+Head look: each frame an NPC may set `lookOn` with `lookX, lookY, lookZ` (a map point and absolute height); `npc/realpool.js` turns
+the rigged model's head and neck toward it. Footballers watch the ball, others the player when close and in front of them. The field's kids are a 3-a-side match (`behavior: 'football'`, `team` 0/1, `fpos` keep/def/att; team 0 attacks
 `FIELD.goals[1]`); they act on the ball only through `npcKick` and `pushBall`. Do not use `n.slot` for anything: it is the
 rigged-model slot from `realpool.js`.
 

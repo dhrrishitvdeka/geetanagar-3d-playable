@@ -532,12 +532,17 @@ function makeRealCharacter(appearance = {}, opts = {}) {
     const bn = rig.bn, ax = t.ax, sg = t.sg, R = (n, a, ang) => { if (ang > 1e-4 || ang < -1e-4) { touch(bn[n]); bn[n].quaternion.premultiply(_q.setFromAxisAngle(ax[n][a], ang)); } };
     const ik = Math.min(1, ((ent.Idle_Loop ? ent.Idle_Loop.w : 0) + (ent.Crouch_Idle_Loop ? ent.Crouch_Idle_Loop.w * 0.6 : 0) + (ent.Sitting_Idle_Loop ? ent.Sitting_Idle_Loop.w * 0.7 : 0) + (ent.Idle_Talking_Loop ? ent.Idle_Talking_Loop.w * 0.3 : 0)) / sum2);
     bt += dt;
+    // head look: a given target (o.look, o.lookP) is tracked quickly, in any gait; otherwise idle people glance about now and then
+    const tgt = Number.isFinite(o.look) && !sitNow && state !== 'talk' ? 1 : 0, lw = tgt ? Math.max(ik, 0.7) : ik;
+    if (tgt) { lty = Math.max(-1.15, Math.min(1.15, o.look)); ltp = -sg.lean * Math.max(-0.5, Math.min(0.35, o.lookP || 0)); lookT = 1 + Math.random(); }
+    else if (ik > 0.01 && (lookT -= dt) <= 0) { lookT = 1.8 + Math.random() * 3.6; lty = (Math.random() - 0.5) * (Math.random() < 0.25 ? 1.2 : 0.55); ltp = (Math.random() - 0.4) * 0.3; }
+    if (lw > 0.01) {
+      const e = 1 - Math.exp(-(tgt ? 6 : 2.2) * dt); ly += (lty - ly) * e; lp += (ltp - lp) * e;
+      R('Head', 'y', ly * 0.55 * lw); R('neck_01', 'y', ly * 0.45 * lw); R('Head', 'x', lp * lw);
+    }
     if (ik > 0.01) {
-      if ((lookT -= dt) <= 0) { lookT = 1.8 + Math.random() * 3.6; lty = (Math.random() - 0.5) * (Math.random() < 0.25 ? 1.2 : 0.55); ltp = (Math.random() - 0.4) * 0.3; }
-      const e = 1 - Math.exp(-2.2 * dt); ly += (lty - ly) * e; lp += (ltp - lp) * e;
       const br = Math.sin(bt * 1.7 + bph);
       R('spine_03', 'x', sg.lean * 0.018 * br * ik); R('neck_01', 'x', -sg.lean * 0.008 * br * ik);
-      R('Head', 'y', ly * 0.55 * ik); R('neck_01', 'y', ly * 0.45 * ik); R('Head', 'x', lp * ik);
       R('pelvis', 'z', 0.022 * Math.sin(bt * 0.42 + bph) * ik); R('spine_01', 'z', -0.015 * Math.sin(bt * 0.42 + bph) * ik);
     }
     if (pk > 0.01) { R('spine_01', 'x', sg.lean * 0.08 * pk); R('spine_03', 'x', sg.lean * 0.12 * pk); R('upperarm_r', 'x', sg.arm * 1.0 * pk); R('Head', 'x', -sg.lean * 0.2 * pk); }
