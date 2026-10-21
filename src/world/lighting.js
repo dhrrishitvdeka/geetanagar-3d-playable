@@ -20,12 +20,15 @@ function applySun(hour) {
   scene.environmentIntensity = 0.18 + 0.17 * k;
   updateSky(k, sunDir);
 }
+const UP = new THREE.Vector3(0, 1, 0), _r = new THREE.Vector3(), _u = new THREE.Vector3(), _c = new THREE.Vector3();
 function placeShadow(cx, cz, half) {
   const sc = sun.shadow.camera;
   if (sc.right !== half) { sc.left = -half; sc.right = half; sc.top = half; sc.bottom = -half; sc.near = 1; sc.far = 3000; sc.updateProjectionMatrix(); }
-  // snap to texel grid to stop shimmering while walking
-  const texel = (2 * half) / sun.shadow.mapSize.x; cx = Math.round(cx / texel) * texel; cz = Math.round(cz / texel) * texel;
-  sun.target.position.set(cx, 20, cz); sun.position.set(cx, 20, cz).addScaledVector(sunDir, 1200);
+  // snap the centre on the shadow camera's own right/up axes (Matrix4.lookAt: x = up × z, y = z × x, z = light dir) so texels stay put while walking
+  const texel = (2 * half) / sun.shadow.mapSize.x; _r.crossVectors(UP, sunDir).normalize(); _u.crossVectors(sunDir, _r);
+  _c.set(cx, 20, cz); const cr = Math.round(_c.dot(_r) / texel) * texel, cu = Math.round(_c.dot(_u) / texel) * texel, cf = _c.dot(sunDir);
+  _c.copy(_r).multiplyScalar(cr).addScaledVector(_u, cu).addScaledVector(sunDir, cf);
+  sun.target.position.copy(_c); sun.position.copy(_c).addScaledVector(sunDir, 1200);
 }
 function setShadowSize(n) {
   if (sun.shadow.mapSize.x === n) return;
