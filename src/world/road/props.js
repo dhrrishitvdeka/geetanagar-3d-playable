@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { scene } from '../../core/context.js';
 import { hAt, rng } from '../../core/geo.js';
+import { footRaise } from './footpath.js';
 import { addCollider } from '../geom.js';
 import { M, box, canvasTex, std } from '../materials.js';
 import { banner } from './textures.js';
@@ -8,7 +9,7 @@ import { banner } from './textures.js';
 // ---------- roadside props: Hatigarh traffic island, stalls, signals, cabinets, carts, high-mast light ----------
 // Local frame for props: +x = the side facing the road / the front, y up.
 function put(g, x, y, ang = 0, lift = 0) {
-  g.position.set(x, hAt(x, y) + lift, -y); g.rotation.y = ang;
+  g.position.set(x, hAt(x, y) + footRaise(x, y) + lift, -y); g.rotation.y = ang; // footRaise: props on a raised footpath stand on it
   g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } }); scene.add(g); return g;
 }
 const add = (g, m, x, y, z, rx = 0, ry = 0, rz = 0) => { m.position.set(x, y, z); m.rotation.set(rx, ry, rz); g.add(m); return m; };
@@ -131,8 +132,8 @@ function busShelter(x, y, ang) { // tiled-roof shelter on pillars with a bench; 
   add(g, box(0.6, 0.12, 5.5, std('#9b9488')), -0.9, 0.5, 0); add(g, box(0.1, 1.2, 6.2, std('#b9b1a3')), -1.4, 0.6, 0);
   put(g, x, y, ang);
 }
-function highMast(x, y) { // tall octagonal mast with a lamp ring (the high-mast light near the field)
-  const g = new THREE.Group(), H = 18;
+function highMast(x, y) { // tall octagonal mast with a lamp ring (the high-mast light inside the field, Street View pano x -27 heading 330)
+  const g = new THREE.Group(), H = 20;
   add(g, cyl(0.7, 0.7, 0.5, M.concrete, 8), 0, 0.25, 0);
   add(g, cyl(0.13, 0.3, H, M.steel, 8), 0, 0.5 + H / 2, 0);
   add(g, new THREE.Mesh(new THREE.TorusGeometry(0.9, 0.06, 6, 24), M.steel), 0, H + 0.3, 0, Math.PI / 2);

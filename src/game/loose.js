@@ -59,7 +59,7 @@ function build() {
   const geos = { ball, can, bottle };
   for (const kind in KINDS) {
     const list = OBJ.filter(o => o.kind === kind); if (!list.length) continue;
-    const m = new THREE.InstancedMesh(geos[kind], mats[kind], list.length); m.userData.noMerge = true; m.castShadow = kind === 'ball'; m.frustumCulled = false;
+    const m = new THREE.InstancedMesh(geos[kind], mats[kind], list.length); m.userData.noMerge = true; m.castShadow = kind === 'ball'; m.frustumCulled = false; m.name = 'loose_' + kind;
     list.forEach((o, i) => { o.i = i; }); MESH[kind] = m; scene.add(m);
   }
 }

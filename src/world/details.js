@@ -245,8 +245,8 @@ function buildDetails() {
   if (pots.length) { // terracotta pots (and the odd old paint bucket) with a leafy clump, some in flower
     const potG = new THREE.CylinderGeometry(0.13, 0.095, 0.2, 10); potG.translate(0, 0.1, 0);
     const leafG = new THREE.IcosahedronGeometry(1, 0);
-    const flowers = pots.filter(p => p.flower).length, pm = new THREE.InstancedMesh(potG, new THREE.MeshStandardMaterial({ roughness: 0.9 }), pots.length);
-    const lm = new THREE.InstancedMesh(leafG, new THREE.MeshStandardMaterial({ roughness: 0.8, flatShading: true }), pots.length * 6 + flowers * 3);
+    const flowers = pots.filter(p => p.flower).length, pm = new THREE.InstancedMesh(potG, new THREE.MeshStandardMaterial({ roughness: 0.9 }), pots.length); pm.name = 'pots';
+    const lm = new THREE.InstancedMesh(leafG, new THREE.MeshStandardMaterial({ roughness: 0.8, flatShading: true }), pots.length * 6 + flowers * 3); lm.name = 'pot_leaves';
     let li = 0; const c = new THREE.Color(), GREENS = ['#3f7a2e', '#4e8a34', '#2f6a2a', '#5f9a3a', '#6a9a3a'];
     const leaf = (x, y, z, sx, sy, sz, rx, ry, rz, col) => { dm.position.set(x, y, z); dm.rotation.set(rx, ry, rz); dm.scale.set(sx, sy, sz); dm.updateMatrix(); lm.setMatrixAt(li, dm.matrix); lm.setColorAt(li++, c.set(col)); };
     pots.forEach((p, i) => {
@@ -260,14 +260,14 @@ function buildDetails() {
     lm.count = li; pm.name = 'wall_pots'; for (const m of [pm, lm]) { m.castShadow = m.receiveShadow = true; scene.add(m); } st.pots = pots.length;
   }
   if (dishes.length) {
-    const im = new THREE.InstancedMesh(dishGeometry(), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.45, metalness: 0.15, side: THREE.DoubleSide }), dishes.length), c = new THREE.Color();
+    const im = new THREE.InstancedMesh(dishGeometry(), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.45, metalness: 0.15, side: THREE.DoubleSide }), dishes.length), c = new THREE.Color(); im.name = 'dishes';
     dishes.forEach((d, i) => { dm.position.set(d.x, d.z, -d.y); dm.rotation.set(0, d.yaw, 0); dm.scale.setScalar(1); dm.updateMatrix(); im.setMatrixAt(i, dm.matrix); im.setColorAt(i, c.setScalar(d.c < 0.8 ? 1 : 0.55)); }); // a few older grey ones
     im.castShadow = im.receiveShadow = true; im.name = 'roof_dishes'; scene.add(im); st.dishes = dishes.length;
   }
   if (lines.length) { // steel posts, the wire, and the washing
     const postG = new THREE.CylinderGeometry(0.02, 0.025, 1.85, 5); postG.translate(0, 0.925, 0);
     const wireG = new THREE.BoxGeometry(1, 0.012, 0.012), mat = new THREE.MeshStandardMaterial({ color: '#5d5f60', roughness: 0.6, metalness: 0.4 });
-    const pm = new THREE.InstancedMesh(postG, mat, lines.length * 2), wm = new THREE.InstancedMesh(wireG, mat, lines.length);
+    const pm = new THREE.InstancedMesh(postG, mat, lines.length * 2), wm = new THREE.InstancedMesh(wireG, mat, lines.length); pm.name = 'washing_posts'; wm.name = 'washing_lines';
     lines.forEach((l, i) => {
       for (const [k, x, y] of [[0, l.x0, l.y0], [1, l.x1, l.y1]]) { dm.position.set(x, l.z, -y); dm.rotation.set(0, 0, 0); dm.scale.setScalar(1); dm.updateMatrix(); pm.setMatrixAt(i * 2 + k, dm.matrix); }
       const len = Math.hypot(l.x1 - l.x0, l.y1 - l.y0); dm.position.set((l.x0 + l.x1) / 2, l.H + 0.01, -(l.y0 + l.y1) / 2); dm.rotation.set(0, Math.atan2(l.y1 - l.y0, l.x1 - l.x0), 0); dm.scale.set(len, 1, 1); dm.updateMatrix(); wm.setMatrixAt(i, dm.matrix);

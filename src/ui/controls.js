@@ -4,6 +4,7 @@ import { $, camera, canvas, stage } from '../core/context.js';
 import { CX0, CX1, CY0, CY1, GEO, HG, HGX1, HGY1, P, VP, clsAt, hAt } from '../core/geo.js';
 import { toggleMap } from './minimap.js';
 import { deckBlocked, groundAt } from '../world/deck.js';
+import { footRaise } from '../world/road/footpath.js';
 import { blockedBySeg } from '../world/geom.js';
 import { hatigarh } from '../world/mainroad.js';
 
@@ -111,7 +112,7 @@ function stepWalk(dt) {
   const dx = (fx * f + rx * s) * speed * dt, dy = (fy * f + ry * s) * speed * dt;
   // move with wall sliding; steep ground also slows you down
   const h0 = groundAt(player.x, player.y);
-  const tryMove = (nx, ny) => { if (!walkable(nx, ny) || deckBlocked(nx, ny, h0)) return false; const dh = groundAt(nx, ny) - h0, dist = Math.hypot(nx - player.x, ny - player.y) || 1; return dh / dist < 1.2; };
+  const tryMove = (nx, ny) => { if (!walkable(nx, ny) || deckBlocked(nx, ny, h0)) return false; const dr = footRaise(nx, ny) - footRaise(player.x, player.y), dh = groundAt(nx, ny) - h0 - dr, dist = Math.hypot(nx - player.x, ny - player.y) || 1; return dr <= 0.45 && dh / dist < 1.2; }; // a kerb up to 0.45 m is a step; the slope test ignores it
   if (tryMove(player.x + dx, player.y + dy)) { player.x += dx; player.y += dy; }
   else { if (tryMove(player.x + dx, player.y)) player.x += dx; else if (tryMove(player.x, player.y + dy)) player.y += dy; }
   const moving = m > 0.05;

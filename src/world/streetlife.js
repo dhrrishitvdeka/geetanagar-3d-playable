@@ -98,7 +98,7 @@ function buildTraffic({ lanes = true } = {}) {
 
 // ---- concrete electric poles with cross-arms, transformers and the tangle of overhead wires seen on every street ----
 function buildPoles() {
-  const poles = [], spans = [], heavy = [];
+  const poles = [], spans = [], heavy = [], laneSp = [], lr = rng(505);
   for (const s of [1, -1]) {
     let last = null;
     for (let i = 3; i < MAINP.length; i += 14) {
@@ -111,13 +111,13 @@ function buildPoles() {
   for (const rd of GEO.roads) {
     const P = resample(rd.p, 30); if (P.length < 2) continue; let last = null; const nn = normalsOf(P);
     for (let i = 0; i < P.length; i++) { const x = P[i][0] + nn[i][0] * (rd.w / 2 + 0.6), y = P[i][1] + nn[i][1] * (rd.w / 2 + 0.6); if (clsAt(x, y) === 2 || clsAt(x, y) === 3) { last = null; continue; } const near = poles.find(q => Math.hypot(q.x - x, q.y - y) < 14); if (near) { if (last && last !== near) spans.push([last, near, 3]); last = near; continue; } // reuse a pole close by (overlapping lane pieces)
-      const cur = { x, y, z: hAt(x, y), h: 8 }; poles.push(cur); if (last) spans.push([last, cur, 3]); last = cur; }
+      const cur = { x, y, z: hAt(x, y), h: 8 }; poles.push(cur); if (last) { spans.push([last, cur, 3 + Math.floor(lr() * 3)]); laneSp.push([last, cur]); } last = cur; }
   }
   // square-section prestressed concrete pole, tapering; galvanised cross-arm with white pin insulators
   const pg = new THREE.CylinderGeometry(0.1, 0.17, 1, 4, 1); pg.rotateY(Math.PI / 4); pg.translate(0, 0.5, 0);
-  const pm = new THREE.InstancedMesh(pg, M.poleConcrete, poles.length);
-  const am = new THREE.InstancedMesh(new THREE.BoxGeometry(1.7, 0.08, 0.08), std('#55595c', { metalness: 0.5, roughness: 0.5 }), poles.length * 2);
-  const ins = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.035, 0.05, 0.16, 8), std('#e9e6dc', { roughness: 0.3 }), poles.length * 6);
+  const pm = new THREE.InstancedMesh(pg, M.poleConcrete, poles.length); pm.name = 'poles';
+  const am = new THREE.InstancedMesh(new THREE.BoxGeometry(1.7, 0.08, 0.08), std('#55595c', { metalness: 0.5, roughness: 0.5 }), poles.length * 2); am.name = 'pole_arms';
+  const ins = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.035, 0.05, 0.16, 8), std('#e9e6dc', { roughness: 0.3 }), poles.length * 6); ins.name = 'pole_insulators';
   const dm = new THREE.Object3D(); let ai = 0, ii = 0;
   poles.forEach((p, k) => {
     const ang = p.main ? Math.atan2(NRM[p.i][1], NRM[p.i][0]) : (k * 1.7) % 3.14;
@@ -175,9 +175,16 @@ function buildPoles() {
     cables.push(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 12, 0.018 + r() * 0.012, 4));
   }
   for (const p of poles.filter(p => p.main)) if (r() < 0.45) { const c = new THREE.TorusGeometry(0.28 + r() * 0.15, 0.04, 5, 16); c.rotateY(r() * 3); c.translate(p.x + 0.2, p.z + p.h - 2.8 - r(), -p.y); cables.push(c); }
+  // lane poles carry the same tangle: two heavy sagging bundles per span (the thin lines above give 3-5 more) and a coil of slack cable on every 4th pole
+  for (const [a, b] of laneSp) for (let w = 0; w < 2; w++) {
+    const L = Math.hypot(b.x - a.x, b.y - a.y), sag = 0.5 + L * 0.025 + r() * 0.7, h0 = a.h - 1.2 - w * 0.35, h1 = b.h - 1.2 - w * 0.35, oz = (w - 0.5) * 0.3;
+    const pts = []; for (let k = 0; k <= 10; k++) { const t = k / 10; pts.push(new THREE.Vector3(a.x + (b.x - a.x) * t + oz, a.z + h0 + (b.z + h1 - a.z - h0) * t - sag * 4 * t * (1 - t), -(a.y + (b.y - a.y) * t))); }
+    cables.push(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 12, 0.014 + r() * 0.01, 4));
+  }
+  poles.filter(p => !p.main).forEach((p, k) => { if (k % 4 === 0) { const c = new THREE.TorusGeometry(0.22 + r() * 0.12, 0.035, 5, 14); c.rotateY(r() * 3); c.translate(p.x + 0.15, p.z + p.h - 2.0 - r() * 0.8, -p.y); cables.push(c); } });
   mergeAdd(cables, std('#121212', { roughness: 0.7 }), true);
   // the high-mast light by the field (position approximate)
-  const HM = RF.high_mast, [hx, hy] = beside(HM.x, HM.side === 'N' ? 1 : -1, hw(nearestOnMain(HM.x, -56)[1]) + 2.2); highMast(hx, hy); // estimated: not seen on Street View
+  const HM = RF.high_mast, [hx, hy] = beside(HM.x, HM.side === 'N' ? 1 : -1, hw(nearestOnMain(HM.x, -56)[1]) + 6.5); highMast(hx, hy); // inside the field, behind the frontage wall (about 3.95 m beyond the right of way); the exact spot is estimated
 }
 
 export { buildHatigarh, buildTraffic, buildPoles, EXTRA_TREES, beside };

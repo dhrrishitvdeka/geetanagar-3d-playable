@@ -94,6 +94,7 @@ function buildKind(kind, cap) { // the paint and the rider's shirt take a colour
   if (paint.length) meshes.push(instMesh(paint.length === 1 ? paint[0] : mergeGeometries(paint, false), paintMat, cap, true, true));
   if (rest.length) meshes.push(instMesh(rest.length === 1 ? rest[0] : mergeGeometries(rest, false), REST, cap, false, true));
   if (shirt.length) meshes.push(instMesh(shirt.length === 1 ? shirt[0] : mergeGeometries(shirt, false), shirtMat, cap, true, true));
+  meshes.forEach((m, k) => { m.name = 'traffic_' + kind + '_' + ['paint', 'rest', 'shirt'][k]; });
   return { meshes, n: 0, live: 0, cap, tinted: paint.length > 0, shirted: shirt.length > 0 };
 }
 
@@ -180,6 +181,7 @@ function stepVeh(v, dt, P) {
   // speed limit: slow through Hatigarh, slow in bends and during a U-turn
   let tgt = v.vmax;
   if (R.main) { const ax = Math.abs(v.x - HAT.x); if (ax < 35) tgt *= ax < 15 ? 0.4 : 0.4 + 0.6 * (ax - 15) / 20; }
+  if (R.main) for (const b of RF.speed_breakers) tgt = Math.min(tgt, 3.5 + (v.vmax - 3.5) * Math.min(1, Math.max(0, (Math.abs(v.x - b.x) - 10) / 10))); // crawl over a speed breaker: 3.5 m/s within 10 m, easing back out to 20 m
   tgt = Math.min(tgt, Math.max(2.5, v.vmax * (1 - Math.min(1, Math.abs(v.dh) / 1.1))));
   if (v.turn > 0) tgt = Math.min(tgt, 2.5);
   if (v.kind === 'bus' && R.main) { // ease in to the stop, wait with the door open, then pull away
@@ -300,7 +302,9 @@ function updateTraffic(dt, player) {
   }
   for (const kind of MIX) KS[kind].n = 0;
   for (let k = 0; k < LIVE.length; k++) writeVeh(LIVE[k]);
-  for (const kind of MIX) { const ks = KS[kind]; for (let m = 0; m < ks.meshes.length; m++) { const im = ks.meshes[m]; im.count = ks.n; if (ks.n) { im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; } } }
+  for (const kind of MIX) { const ks = KS[kind]; for (let m = 0; m < ks.meshes.length; m++) { const im = ks.meshes[m]; im.count = ks.n; if (ks.n) { // only the first n instances were written: upload just those (the crowd.js pattern)
+    im.instanceMatrix.clearUpdateRanges(); im.instanceMatrix.addUpdateRange(0, ks.n * 16); im.instanceMatrix.needsUpdate = true;
+    if (im.instanceColor) { im.instanceColor.clearUpdateRanges(); im.instanceColor.addUpdateRange(0, ks.n * 3); im.instanceColor.needsUpdate = true; } } } }
 }
 function vehicleAt(x, y, r = 0.5) { // oriented rectangle (rounded by r) against the moving fleet
   for (let k = 0; k < LIVE.length; k++) {

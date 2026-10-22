@@ -8,7 +8,7 @@ import { HIP_Y, JN, NJ, charMaterial, evalFrames, geo, mulA, newFrames, poseTarg
 const CAP = 160, DRAW_R = 140, DRAW_R2 = DRAW_R * DRAW_R;
 const PLAN = [ // kind, capacity (all draws are rewritten every frame, so only visible NPCs cost anything)
   ['torso', CAP], ['pelvis', CAP], ['head', CAP], ['uArm', CAP * 2], ['fArm', CAP * 2], ['thigh', CAP * 2], ['shin', CAP * 2],
-  ['hair', CAP], ['skirt', CAP], ['wrap', CAP], ['gamosa', CAP], ['hat', CAP * 2], ['blob', CAP * 5], ['box', CAP * 3],
+  ['hair', CAP], ['skirt', CAP], ['mekhela', CAP], ['sador', CAP], ['wrap', CAP], ['gamosa', CAP], ['hat', CAP * 2], ['blob', CAP * 5], ['box', CAP * 3],
 ];
 const M = {}; // kind -> { mesh, arr, car, n, cap }
 let built = false, drawn = 0;

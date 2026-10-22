@@ -6,7 +6,7 @@ import { Aborted, shopTalk } from './npcs.js';
 // world/shops.js records one bay per open frontage (SHOP_BAYS); each becomes a spot that fills, while you are within ~60 m and
 // the shops are open, with a keeper standing behind the counter. What they wear, say and sell follows the signboard. The shops
 // whose sign fits a shop table in items.js (sweets, tea, groceries, dresses...) sell through the usual "Buy something".
-const MEKHELA = [['#d6b25e', '#e2c57a', '#8e1f2f'], ['#efe7d2', '#f2ebd8', '#1f6a45'], ['#7a1c2c', '#7a1c2c', '#d9b44a'], ['#2d6a4f', '#2d6a4f', '#efe3c2']]; // mekhela, sador, blouse (= motif)
+const MEKHELA = [['#cdae6c', '#d8bd7f', '#8e1f2f', '#a3172b', 'silk'], ['#efe6cf', '#f3ecd9', '#1f6a45', '#b3202e', 'silk'], ['#7a1c2c', '#7a1c2c', '#d9b44a', '#d9b44a', 'cotton'], ['#2d6a4f', '#2d6a4f', '#efe3c2', '#d9b44a', 'cotton']]; // mekhela, sador, blouse, motif, fabric
 const pick = (a, k) => a[k % a.length];
 const titleCase = s => s.toLowerCase().replace(/\b\w/g, c => c.toUpperCase()).replace(/&/g, 'and');
 
@@ -23,7 +23,7 @@ const CALLS = {
 
 // per kind of shop: role, look, how they greet you, small talk
 const KEEP = {
-  cloth: k => ({ role: 'vendor', app: (() => { const [m, w, b] = pick(MEKHELA, k); return { female: true, hairStyle: 'bun', topStyle: 'blouse', top: b, bottomStyle: 'mekhela', bottom: m, wrap: w, motif: b }; })(),
+  cloth: k => ({ role: 'vendor', app: (() => { const [m, w, b, mo, fab] = pick(MEKHELA, k); return { female: true, hairStyle: 'bun', topStyle: 'blouse', top: b, bottomStyle: 'mekhela', bottom: m, wrap: w, motif: mo, fabric: fab }; })(),
     greet: 'Nomoskar! Muga, pat and eri, all handloom from Sualkuchi. Bihu is around the corner, no?',
     chat: [['Every mekhela sador here came off a loom in Sualkuchi. Look at the border, you can count the threads in the motifs.'], ['Muga silk only gets more golden as it gets older. My mother still wears the one from her wedding.'], ['For Bihu the girls want red and gold. The boys want a new gamosa and a japi, and they all want it yesterday.']] }),
   sweets: k => ({ role: 'vendor', app: { female: false, topStyle: 'shirt', top: '#f4efe2', gamosa: k % 2 === 0 }, greet: 'Til pitha, narikol laru, jalebi straight from the oil. What will it be?',

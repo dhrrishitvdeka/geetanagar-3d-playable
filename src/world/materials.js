@@ -26,6 +26,17 @@ const TEX = {
     g.fillStyle = 'rgba(60,55,50,0.35)'; for (let i = 0; i < 40; i++) g.fillRect(r() * w, r() * h, 3 + r() * 10, 2 + r() * 6);
     speckle(g, w, h, 3000, ['rgba(0,0,0,0.15)', 'rgba(255,255,255,0.12)']);
   }),
+  footSlab: canvasTex(256, 256, (g, w, h) => { // grey concrete slab footpath, 1 m per tile (world UV = 1): a joint every metre, wear and speckle
+    const r = rng(12);
+    g.fillStyle = '#bdb9af'; g.fillRect(0, 0, w, h);
+    for (let i = 0; i < 60; i++) { g.fillStyle = r() < 0.5 ? 'rgba(90,84,74,0.10)' : 'rgba(235,230,220,0.12)'; g.beginPath(); g.ellipse(r() * w, r() * h, 10 + r() * 40, 8 + r() * 24, r() * 3, 0, 7); g.fill(); }
+    speckle(g, w, h, 3500, ['#9d998f', '#cfcbc1', '#a8a398', '#8f8b82']);
+    g.fillStyle = '#8a867d'; g.fillRect(0, 0, 4, h); g.fillRect(0, 0, w, 4);
+  }),
+  speedBreaker: canvasTex(64, 8, (g, w, h) => { // yellow and black bands across a speed breaker: one repeat = 0.7 m along the road
+    g.fillStyle = '#e8b81c'; g.fillRect(0, 0, w / 2, h); g.fillStyle = '#1d1e20'; g.fillRect(w / 2, 0, w / 2, h);
+    speckle(g, w, h, 60, ['rgba(110,92,70,0.35)', 'rgba(0,0,0,0.2)']);
+  }),
   kerb: canvasTex(256, 32, (g, w, h) => { // the black-and-white painted kerb seen all along Mother Teresa Rd
     for (let x = 0; x < w; x += 64) { g.fillStyle = '#e9e8e2'; g.fillRect(x, 0, 32, h); g.fillStyle = '#1f2124'; g.fillRect(x + 32, 0, 32, h); }
     speckle(g, w, h, 900, ['rgba(120,100,80,0.35)', 'rgba(0,0,0,0.25)']);
@@ -50,7 +61,7 @@ const TEX = {
   }),
 };
 // PBR-ish procedural sets (colour + roughness + bump) from road/textures.js
-const PBR = { asphalt: T.asphalt(), shoulder: T.shoulder(), kerb: T.kerb(), concrete: T.concrete(), brick: T.brick(), kerbGreen: T.kerb('#4d7348'), pole: T.concrete(131, '#b3afa6') };
+const PBR = { asphalt: T.asphalt(), shoulder: T.shoulder(), kerb: T.kerb(), concrete: T.concrete(), brick: T.brick(), kerbGreen: T.kerb('#4d7348'), footKerb: T.kerb('#f3f1ea', 0.3), pole: T.concrete(131, '#b3afa6') };
 const rep = (set, x, y) => { for (const k of ['map', 'roughnessMap', 'bumpMap']) if (set[k]) set[k].repeat.set(x, y); return set; };
 const M = {
   // world-UV strips use 1 unit = 6 m for asphalt, so the 8 m texture is scaled by 6/8
@@ -64,7 +75,10 @@ const M = {
   laneDust: null,
   edge: new THREE.MeshStandardMaterial({ color: '#b6b0a2', roughness: 0.95, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }),
   paver: new THREE.MeshStandardMaterial({ map: TEX.paver, roughness: 0.9, side: THREE.DoubleSide }),
+  speedBreaker: new THREE.MeshStandardMaterial({ map: TEX.speedBreaker, roughness: 0.85, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 }),
+  footSlab: new THREE.MeshStandardMaterial({ map: TEX.footSlab, roughness: 0.95, side: THREE.DoubleSide }),
   kerb: new THREE.MeshStandardMaterial({ ...PBR.kerb, bumpScale: 1, roughness: 1, side: THREE.DoubleSide }),
+  footKerb: new THREE.MeshStandardMaterial({ ...PBR.footKerb, color: new THREE.Color(1.3, 1.3, 1.3), emissive: new THREE.Color(1, 1, 1), emissiveMap: PBR.footKerb.map, emissiveIntensity: 0.45, bumpScale: 1, roughness: 1, side: THREE.DoubleSide }), // the footpath's painted face is 0.4 m tall and the south side's is always in shadow: fresher paint, lifted by its own map so the white blocks still read
   kerbGreen: new THREE.MeshStandardMaterial({ ...PBR.kerbGreen, bumpScale: 1, roughness: 1, side: THREE.DoubleSide }),
   concrete: new THREE.MeshStandardMaterial({ ...PBR.concrete, bumpScale: 1.5, roughness: 1 }),
   poleConcrete: new THREE.MeshStandardMaterial({ ...PBR.pole, bumpScale: 1, roughness: 1 }),
@@ -73,16 +87,32 @@ const M = {
   lawn: new THREE.MeshStandardMaterial({ map: TEX.lawn, roughness: 1, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 }),
   brick: new THREE.MeshStandardMaterial({ ...PBR.brick, bumpScale: 2, roughness: 1 }),
   black: new THREE.MeshStandardMaterial({ color: '#1d1e20', roughness: 0.55, metalness: 0.5 }),
-  railInfill: new THREE.MeshStandardMaterial({ color: '#1d1e20', map: T.railBars(), alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.55, metalness: 0.5 }),
+  railInfill: new THREE.MeshStandardMaterial({ color: '#1d1e20', map: T.railBars(), alphaTest: 0.5, alphaToCoverage: QUALITY !== 'low', side: THREE.DoubleSide, roughness: 0.55, metalness: 0.5 }),
   fieldPanel: new THREE.MeshStandardMaterial({ map: T.fieldPanel(), roughness: 0.7, metalness: 0.2 }),
   // Baikuntha Rd side of the field: brick wall painted terracotta red, chain-link above it (Street View, Mar 2026)
   redWall: new THREE.MeshStandardMaterial({ ...PBR.concrete, color: '#c4604a', bumpScale: 1.5, roughness: 1 }),
-  chainLink: new THREE.MeshStandardMaterial({ color: '#9aa0a3', map: T.chainLink(), alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.5, metalness: 0.6 }),
+  chainLink: new THREE.MeshStandardMaterial({ color: '#9aa0a3', map: T.chainLink(), alphaTest: 0.5, alphaToCoverage: QUALITY !== 'low', side: THREE.DoubleSide, roughness: 0.5, metalness: 0.6 }),
   yellow: new THREE.MeshStandardMaterial({ color: '#d9b62b', roughness: 0.6, metalness: 0.2 }),
   maroon: new THREE.MeshStandardMaterial({ color: '#7d2630', roughness: 0.6 }),
   white: new THREE.MeshStandardMaterial({ color: '#f1efe8', roughness: 0.8 }),
   steel: new THREE.MeshStandardMaterial({ color: '#8e9499', roughness: 0.4, metalness: 0.6 }),
 };
+// road anti-tiling: the asphalt texture repeats every 8 m, so a slow world-space value noise (a patch every ~20 m, plus a finer one) varies its brightness by +-12%.
+// terrain.js does the same with its noise texture; this one is procedural so the road materials need no extra sampler.
+function antiTile(m) {
+  const prev = m.onBeforeCompile;
+  m.onBeforeCompile = function (sh) {
+    if (prev) prev.call(this, sh);
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vAT;').replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nvAT = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
+varying vec3 vAT;
+float atH(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float atN(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(atH(i), atH(i + vec2(1.0, 0.0)), f.x), mix(atH(i + vec2(0.0, 1.0)), atH(i + vec2(1.0, 1.0)), f.x), f.y); }`)
+      .replace('#include <map_fragment>', '#include <map_fragment>\ndiffuseColor.rgb *= 0.88 + 0.24 * (atN(vAT.xz * 0.05) * 0.65 + atN(vAT.xz * 0.21) * 0.35);');
+  };
+  m.customProgramCacheKey = () => (m.userData.pck || 'std') + 'antitile';
+}
+antiTile(M.asphalt); antiTile(M.laneAsphalt);
 M.laneDust = M.dust.clone(); M.laneDust.color = new THREE.Color(1.08, 0.88, 0.7); // the lane edges fade into reddish dust
 const box = (w, h, d, mat) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
 const std = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.75, ...extra });

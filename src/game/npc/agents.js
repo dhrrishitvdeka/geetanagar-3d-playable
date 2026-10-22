@@ -645,7 +645,8 @@ function locomote(n, dt, cheap) {
   }
 }
 function stepNPC(n, dt, cheap) {
-  n.z = n.zFix !== undefined ? n.zFix : groundAt(n.x, n.y); // zFix: a shop floor above the street
+  if (n.zFix !== undefined) n.z = n.zFix; // zFix: a shop floor above the street
+  else { const g = groundAt(n.x, n.y); n.z = Math.abs(g - n.z) < 0.6 ? n.z + (g - n.z) * Math.min(1, dt * 14) : g; } // a kerb is eased over a few frames, not popped
   n.lookOn = false;
   if (n.talking) { if (P) { turnTo(n, Math.atan2(P.y - n.y, P.x - n.x), 6, dt); lookAtPlayer(n); } n.state = 'talk'; n.speed = 0; n.vx = n.vy = 0; return; }
   if (n.flinchT > 0) { n.flinchT -= dt; n.x += n.slideX * dt; n.y += n.slideY * dt; n.state = 'flinch'; n.speed = 0; return; }

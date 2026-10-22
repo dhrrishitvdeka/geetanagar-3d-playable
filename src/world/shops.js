@@ -3,6 +3,7 @@ import { scene } from '../core/context.js';
 import { P, hAt, hash2, rng } from '../core/geo.js';
 import { addCollider, normalsOf } from './geom.js';
 import { MAINP, hw, nearestOnMain } from './mainroad.js';
+import { footRaise } from './road/footpath.js';
 import { MAT, box, canvasTex, std } from './materials.js';
 import { facadeMaterials } from './bldg/facades.js';
 import { MeshBuilder } from './bldg/mesh.js';
@@ -32,7 +33,7 @@ function kiosk(x, y, ang, body, name, signBg, signFg) {
   const sign = new THREE.Mesh(new THREE.BoxGeometry(W + 0.4, 0.55, 0.06), [bm, bm, bm, bm, new THREE.MeshStandardMaterial({ map: kioskTex(name, signBg, signFg) }), bm]);
   sign.position.set(0, H + 0.48, D / 2 + 0.55); g.add(sign);
   const stool = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.45, 10), std('#2f6fb3')); stool.position.set(W / 2 + 0.5, 0.22, D / 2 + 0.3); g.add(stool);
-  g.position.set(x, hAt(x, y), -y); g.rotation.y = ang; g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  g.position.set(x, hAt(x, y) + footRaise(x, y), -y); g.rotation.y = ang; g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
   scene.add(g);
   const c = Math.cos(ang), s = Math.sin(ang), pts = [[-W / 2, -D / 2], [W / 2, -D / 2], [W / 2, D / 2], [-W / 2, D / 2]].map(([u, v]) => [x + u * c + v * s, y + u * s - v * c]);
   // local z (toward the road) maps to -y in world when ang = 0
@@ -64,6 +65,11 @@ const TAGS = ['Grocery • Cold Drinks • Recharge', 'Medicines • Surgicals �
 const BANK_SIGN = 15;
 const SIGN_COLS = [['#c62828', '#ffffff', '#ffd54f'], ['#f9c80e', '#b71c1c', '#1a237e'], ['#1565c0', '#ffffff', '#ffeb3b'], ['#2e7d32', '#ffffff', '#ffeb3b'], ['#ffffff', '#c62828', '#1565c0'],
   ['#6a1b9a', '#ffeb3b', '#ffffff'], ['#ef6c00', '#ffffff', '#1b1b1b'], ['#00838f', '#ffffff', '#ffeb3b'], ['#ad1457', '#ffffff', '#ffe082'], ['#283593', '#ffeb3b', '#ffffff'], ['#f5f0e1', '#1b5e20', '#c62828'], ['#212121', '#ffc107', '#ffffff']];
+// Street View (Mar 2026): flex boards are bilingual, the English name over an Assamese word for the kind of shop. Words are by sign row; a native reader
+// should check the spellings. Skipped when no installed font draws Bengali-script glyphs (the fallback would print empty boxes).
+const AS = { 0: 'দোকান', 1: 'ঔষধালয়', 2: 'মিঠাইৰ দোকান', 4: 'হাৰ্ডৱেৰ', 5: 'ষ্টেচনাৰী', 9: 'চাহৰ দোকান', 10: 'ষ্টেচনাৰী', 13: 'মিঠাইৰ দোকান', 14: 'দোকান', 16: 'দোকান', 17: 'ঔষধালয়', 18: 'হাৰ্ডৱেৰ', 19: 'হাৰ্ডৱেৰ', 22: 'ষ্টেচনাৰী', 25: 'ঔষধালয়' };
+const BN_FONT = '"Nirmala UI", "Noto Sans Bengali", "Vrinda", sans-serif';
+const HAS_BN = (() => { const g = document.createElement('canvas').getContext('2d'); g.font = '40px ' + BN_FONT; const w = [...'ষটেচনাৰীঔধলয'].map(c => g.measureText(c).width); return Math.max(...w) - Math.min(...w) > 1; })(); // empty boxes are all one width, real glyphs are not
 const signAtlas = canvasTex(2048, 2048, (g) => {
   const r = rng(77);
   for (let i = 0; i < 32; i++) {
@@ -74,9 +80,11 @@ const signAtlas = canvasTex(2048, 2048, (g) => {
     g.fillStyle = ac; g.fillRect(x, y + 112, 1024, 6);
     if (i !== BANK_SIGN) { g.beginPath(); g.arc(x + 70, y + 58, 44, 0, 7); g.fill(); g.fillStyle = bg; g.font = 'bold 44px Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(SHOP_NAMES[i][0], x + 70, y + 60); }
     g.fillStyle = fg; g.textAlign = 'center'; g.textBaseline = 'middle';
-    let fs = 64; g.font = `bold ${fs}px Arial Black, Arial, sans-serif`; while (g.measureText(SHOP_NAMES[i]).width > 800 && fs > 30) { fs -= 2; g.font = `bold ${fs}px Arial Black, Arial, sans-serif`; }
-    g.fillText(SHOP_NAMES[i], x + 560, y + (TAGS[i] ? 46 : 60));
-    if (TAGS[i]) { g.font = 'bold 24px Arial, sans-serif'; g.fillStyle = ac; g.fillText(TAGS[i], x + 560, y + 92); }
+    const bn = HAS_BN && AS[i]; // bilingual: name, Assamese word, then the tagline in smaller type
+    let fs = bn ? 44 : 64; g.font = `bold ${fs}px Arial Black, Arial, sans-serif`; while (g.measureText(SHOP_NAMES[i]).width > 800 && fs > 30) { fs -= 2; g.font = `bold ${fs}px Arial Black, Arial, sans-serif`; }
+    g.fillText(SHOP_NAMES[i], x + 560, y + (bn ? 25 : TAGS[i] ? 46 : 60));
+    if (bn) { g.font = 'bold 32px ' + BN_FONT; g.fillText(AS[i], x + 560, y + 66); }
+    if (TAGS[i]) { g.font = bn ? 'bold 20px Arial, sans-serif' : 'bold 24px Arial, sans-serif'; g.fillStyle = ac; g.fillText(TAGS[i], x + 560, y + (bn ? 100 : 92)); }
     // sun fading, dust and creases
     g.fillStyle = 'rgba(255,255,255,0.08)'; g.fillRect(x, y, 1024, 50);
     for (let k = 0; k < 6; k++) { g.fillStyle = `rgba(0,0,0,${0.03 + r() * 0.05})`; g.fillRect(x + r() * 1024, y, 2 + r() * 3, 128); }

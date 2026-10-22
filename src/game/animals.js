@@ -47,7 +47,7 @@ function mkMesh(parts, cap, shadow) {
   geo.setAttribute('aAlt', new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3)); geo.setAttribute('aTrim', new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3));
   const im = new THREE.InstancedMesh(geo, ANIM, cap); // matrices start as zeros: nothing is drawn until an animal is posed
   im.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3);
-  im.instanceMatrix.setUsage(THREE.DynamicDrawUsage); im.frustumCulled = false; im.castShadow = shadow && SHADOWS; im.receiveShadow = true; im.userData.noMerge = true;
+  im.instanceMatrix.setUsage(THREE.DynamicDrawUsage); im.frustumCulled = false; im.castShadow = shadow && SHADOWS; im.receiveShadow = true; im.userData.noMerge = true; im.userData.lo = 0; im.userData.hi = cap - 1; // first frame uploads everything
   scene.add(im); return im;
 }
 function paint(im, i, coat, alt, trim) {
@@ -238,7 +238,9 @@ function herdStep(h, dt) {
 
 // ---------- posing ----------
 const _root = new THREE.Matrix4(), _a = new THREE.Matrix4(), _b = new THREE.Matrix4(), _c = new THREE.Matrix4(), _d = new THREE.Matrix4(), _eu = new THREE.Euler(), _sv = new THREE.Vector3();
-const put = (mesh, i, m) => m.toArray(mesh.instanceMatrix.array, i * 16);
+// each mesh remembers the slot range written since its last upload, so only that part of the buffer goes to the GPU (the crowd.js pattern)
+const mark = (mesh, i0, i1 = i0) => { const u = mesh.userData; if (i0 < u.lo) u.lo = i0; if (i1 > u.hi) u.hi = i1; };
+const put = (mesh, i, m) => { m.toArray(mesh.instanceMatrix.array, i * 16); mark(mesh, i); };
 function local(m, tx, ty, tz, rx, ry, rz, order = 'XYZ') { _eu.set(rx, ry, rz, order); m.makeRotationFromEuler(_eu); m.setPosition(tx, ty, tz); return m; }
 function rotAbout(m, px, py, rz, dx, dy) { const c = Math.cos(rz), s = Math.sin(rz); m.makeRotationZ(rz); m.setPosition(px - (c * px - s * py) + dx, py - (s * px + c * py) + dy, 0); }
 function rootMat(a, h) { _root.makeRotationY(a.heading); if (a.sc !== 1) _root.scale(_sv.setScalar(a.sc)); _root.setPosition(a.x, h, -a.y); }
@@ -260,8 +262,8 @@ function poseQuad(a, S, mb, mh, mt, ml) {
 }
 function hide(a) {
   const parts = a.kind === 'dog' ? [M.dogBody, M.dogHead, M.dogTail] : a.kind === 'cow' ? [M.cowBody, M.cowHead] : [M.goatBody, M.goatHead];
-  for (const m of parts) m.instanceMatrix.array.fill(0, a.si * 16, a.si * 16 + 16);
-  M.legs.instanceMatrix.array.fill(0, a.leg0 * 16, (a.leg0 + 4) * 16);
+  for (const m of parts) { m.instanceMatrix.array.fill(0, a.si * 16, a.si * 16 + 16); mark(m, a.si); }
+  M.legs.instanceMatrix.array.fill(0, a.leg0 * 16, (a.leg0 + 4) * 16); mark(M.legs, a.leg0, a.leg0 + 3);
 }
 
 // ---------- crows ----------
@@ -379,6 +381,7 @@ function initAnimals() {
     M.goatBody = mkMesh(GEOM.goatBody, nGoat, false); M.goatHead = mkMesh(GEOM.goatHead, nGoat, false);
     M.legs = mkMesh(GEOM.leg, (nDog + COWS.length + nGoat) * 4, true);
     M.crow = mkMesh(GEOM.crow, nCrow, false); M.wing = mkMesh(GEOM.wing, nCrow * 2, false);
+    for (const k in M) M[k].name = 'animal_' + k;
     const give = (list, body, coats, hoof) => list.forEach((a, k) => {
       a.si = k; a.leg0 = legCount; legCount += 4; const c = coats[k % coats.length], trim = a === pori ? '#c4262e' : null;
       paint(body, k, a === pori ? '#dcc197' : c[0], a === pori ? null : c[1], trim);
@@ -424,7 +427,7 @@ function updateAnimals(dt, player) {
   for (const g of HERDS) herdStep(g, dt);
   for (const f of FLOCKS) {
     const d2 = (f.cx - player.x) ** 2 + (f.cy - player.y) ** 2;
-    if (d2 > SHOW * SHOW) { if (!f.hidden) { for (const c of f.crows) { M.crow.instanceMatrix.array.fill(0, c.si * 16, c.si * 16 + 16); M.wing.instanceMatrix.array.fill(0, c.si * 32, c.si * 32 + 32); } f.hidden = true; } continue; }
+    if (d2 > SHOW * SHOW) { if (!f.hidden) { for (const c of f.crows) { M.crow.instanceMatrix.array.fill(0, c.si * 16, c.si * 16 + 16); M.wing.instanceMatrix.array.fill(0, c.si * 32, c.si * 32 + 32); mark(M.crow, c.si); mark(M.wing, c.si * 2, c.si * 2 + 1); } f.hidden = true; } continue; }
     if (f.hidden) { f.hidden = false; f.dirty = true; }
     const awake = d2 < SLEEP * SLEEP || f.state !== 'ground';
     if (!awake && !f.dirty) continue;
@@ -432,7 +435,7 @@ function updateAnimals(dt, player) {
     f.dirty = false;
     for (const c of f.crows) poseCrow(c, f);
   }
-  for (const key in M) M[key].instanceMatrix.needsUpdate = true;
+  for (const key in M) { const im = M[key], u = im.userData; if (u.hi < u.lo) continue; im.instanceMatrix.clearUpdateRanges(); im.instanceMatrix.addUpdateRange(u.lo * 16, (u.hi - u.lo + 1) * 16); im.instanceMatrix.needsUpdate = true; u.lo = Infinity; u.hi = -1; }
 }
 function allAnimals() { return ALL; }
 function animalBlocking(x, y, r = 0.4) { // only cows stand in the way: dogs and goats would just be annoying

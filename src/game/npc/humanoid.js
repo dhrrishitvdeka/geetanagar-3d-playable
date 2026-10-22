@@ -185,6 +185,16 @@ function build(kind) {
       for (let i = 0; i < p.count; i++) { const y = p.getY(i), c = y > -0.1 ? [0.78, 0.78, 0.78] : y < -0.87 ? [1, 0.86, 0.58] : [1, 1, 1]; a[i * 3] = c[0]; a[i * 3 + 1] = c[1]; a[i * 3 + 2] = c[2]; }
       g2.setAttribute('color', new THREE.BufferAttribute(a, 3)); return g2;
     }
+    case 'mekhela': { // a near-straight tube from the waist to the ankle (a mekhela is not a bell); darker hem border and waist band
+      const g = new THREE.CylinderGeometry(0.165, 0.2, 1, 14, 8, true); g.deleteAttribute('uv'); g.translate(0, -0.5, 0); const g2 = g.toNonIndexed(), p = g2.attributes.position, a = new Float32Array(p.count * 3);
+      for (let i = 0; i < p.count; i++) { const y = p.getY(i), k = y < -0.86 ? 0.62 : y > -0.1 ? 0.8 : 1; a[i * 3] = a[i * 3 + 1] = a[i * 3 + 2] = k; }
+      g2.setAttribute('color', new THREE.BufferAttribute(a, 3)); return g2;
+    }
+    case 'sador': { // a mekhela's sador: the sash across the chest, and a narrow anchal down the back from the wearer's LEFT shoulder (left is -z with the group facing +x)
+      const sash = new THREE.BoxGeometry(0.035, 0.62, 0.12); sash.rotateX(0.55);
+      const anchal = new THREE.BoxGeometry(0.035, 0.68, 0.13);
+      return merge([bit(sash, [1, 1, 1], 0.118, 0.3, 0), bit(anchal, [1, 1, 1], -0.115, 0.2, -0.085), boxG(0.04, 0.09, 0.13, -0.115, -0.185, -0.085, [0.62, 0.55, 0.5]), boxG(0.1, 0.035, 0.2, 0, 0.545, -0.06, [1, 1, 1])]);
+    }
     case 'wrap': { // chador / sari pallu: a sash across the chest and a drape down the back, darker border at the hem
       const sash = new THREE.BoxGeometry(0.035, 0.62, 0.17); sash.rotateX(0.55);
       const cape = new THREE.BoxGeometry(0.035, 0.68, 0.36); cape.translate(0, 0.0, 0);
@@ -192,7 +202,7 @@ function build(kind) {
     }
     case 'gamosa': { // white cotton scarf round the neck with red ends hanging on the chest
       const ring = new THREE.TorusGeometry(0.1, 0.028, 5, 10); ring.rotateX(Math.PI / 2);
-      return merge([bit(ring, [0.95, 0.95, 0.93], 0, 0.55, 0), boxG(0.02, 0.12, 0.075, 0.118, 0.46, 0.045, [0.95, 0.95, 0.93]), boxG(0.02, 0.1, 0.075, 0.118, 0.35, 0.045, [1, 0.08, 0.06])]);
+      return merge([bit(ring, [0.95, 0.95, 0.93], 0, 0.55, 0), boxG(0.02, 0.12, 0.075, 0.118, 0.46, 0.045, [0.95, 0.95, 0.93]), boxG(0.021, 0.02, 0.077, 0.118, 0.42, 0.045, [1, 0.08, 0.06]), boxG(0.02, 0.1, 0.075, 0.118, 0.35, 0.045, [1, 0.08, 0.06])]);
     }
     case 'hat': return merge([cylG(0.1, 0.5, 0.8, 10, 0.4), cylG(0.02, 0.1, 0.2, 10, 0.9, [1, 0.1, 0.08])]); // cone, base radius 0.5, red knob on top
     case 'blob': return bit(new THREE.IcosahedronGeometry(0.5, 1));
@@ -235,9 +245,9 @@ function buildRecipe(app) {
   // garments below the waist: skirts are one open frustum scaled to length and width
   const skirt = (len, w, c) => add('skirt', FR.HIPS, [0, 0.07, 0], [w, len, w], null, c);
   const bs = a.bottomStyle;
-  if (bs === 'mekhela' || bs === 'sari') skirt(0.78, 1.0, bot); else if (bs === 'skirt') skirt(kid ? 0.3 : 0.36, 0.95, bot); else if (bs === 'dhoti') { skirt(0.66, 0.78, bot); tint.thigh = bot; }
+  if (bs === 'mekhela' || bs === 'sari') add('mekhela', FR.HIPS, [0, 0.07, 0], [1, 0.78, 1], null, bot); else if (bs === 'skirt') skirt(kid ? 0.3 : 0.36, 0.95, bot); else if (bs === 'dhoti') { skirt(0.66, 0.78, bot); tint.thigh = bot; }
   if (a.topStyle === 'kurta') skirt(0.5, 0.86, top); else if (a.topStyle === 'robe') skirt(0.8, 1.04, top);
-  if (a.wrap) add('wrap', FR.TORSO, null, null, null, col(a.wrap));
+  if (a.wrap) add(bs === 'mekhela' || bs === 'sari' ? 'sador' : 'wrap', FR.TORSO, null, null, null, col(a.wrap)); // salwar wearers keep the dupatta's cape
   if (a.gamosa) add('gamosa', FR.TORSO, null, null, null, [1, 1, 1]);
   // what the right hand holds (one thing), and carried bags
   let hold = HOLD.NONE;
@@ -313,7 +323,9 @@ const M_TEE = ['#c0392b', '#1f77b4', '#2e8b57', '#f39c12', '#8e44ad', '#16a085',
 const M_KURTA = ['#f0ead8', '#e8d9b5', '#7aa7c7', '#9ab973', '#d7a86e', '#b36b5e', '#c9c0d8'];
 const M_PANTS = ['#2b2f3a', '#3a3f4b', '#5b4a3a', '#6b6f78', '#252525', '#4a5568', '#3b5b8c', '#2f4a73', '#47658f'];
 const M_SHORTS = ['#6b7a8f', '#8a7a5a', '#3b4a5a', '#2c3e50', '#556b4f'];
-const MEKHELA = [['#ece0bc', '#ece0bc', '#8e2f4a'], ['#7a1c2c', '#7a1c2c', '#d9b44a'], ['#2d6a4f', '#2d6a4f', '#efe3c2'], ['#d3a43a', '#d3a43a', '#7a1c2c'], ['#f1ead6', '#f1ead6', '#2b5d8a'], ['#c9a24a', '#ece0bc', '#4a2a6a']]; // mekhela, chador, blouse
+// mekhela, sador, blouse, motif, fabric: muga (golden beige) and pat (ivory) silk with red motifs; cotton for daily wear
+const MEKHELA = [['#cdae6c', '#d8bd7f', '#8e1f2f', '#a3172b', 'silk'], ['#efe6cf', '#f3ecd9', '#1f6a45', '#b3202e', 'silk'], ['#e9c46a', '#f1e3b8', '#2a6f6b', '#1d6e5a', 'cotton'],
+  ['#f2a2b4', '#f6d2da', '#7a1c3c', '#7a1c3c', 'cotton'], ['#7fb3d5', '#d6e7f2', '#1f3f6b', '#1f3f6b', 'cotton'], ['#c94f4f', '#e8b4a0', '#3a2a1a', '#e2b84f', 'cotton']];
 const SARI = [['#b03060', '#b03060', '#e8c46a'], ['#2e6f95', '#2e6f95', '#f0e6d0'], ['#c77d3a', '#e8c46a', '#5a2a3a'], ['#6a8d3a', '#6a8d3a', '#f4ead0'], ['#8b2a5a', '#d9a0b8', '#2f2f3a'], ['#d1495b', '#d1495b', '#f1e6d4'], ['#3d5a80', '#98c1d9', '#ffffff']];
 const KURTI = ['#6aa5c8', '#d98e73', '#9bc59d', '#c78fb5', '#e3c16f', '#d3687c'], SALWAR = ['#f0e6d6', '#3d4a6b', '#6a3d5a', '#e9e2cf', '#2f5d50'], DUPATTA = ['#f4e9d8', '#c9406a', '#5a8fb8', '#d9b44a'];
 const UNI_BOT = ['#232f55', '#5d6168', '#6d2330'], BAGS = ['#2a4d8f', '#b5392f', '#2f2f33', '#3c7a4a', '#d98a2a', '#7a4a8a', '#6b4a2c'], UMBR = ['#161616', '#161616', '#161616', '#c0392b', '#2a6fb5', '#e6b422', '#3c8a4a'];
@@ -335,7 +347,7 @@ function randomAppearance(rand = Math.random, opts = {}) {
   if (role === 'student') { a.height = rng2(rand, 0.74, 0.95); a.kid = a.height < 0.8; a.build = rng2(rand, 0.9, 1.0); }
   if (female) {
     a.hairStyle = chance(rand, 0.5) ? 'long' : chance(rand, 0.8) ? 'bun' : 'short';
-    if (style === 'mekhela') { const [m, w, b] = pick(rand, MEKHELA); a.bottom = m; a.bottomStyle = 'mekhela'; a.wrap = w; a.top = b; a.topStyle = 'blouse'; }
+    if (style === 'mekhela') { const [m, w, b, mo, fab] = pick(rand, MEKHELA); a.bottom = m; a.bottomStyle = 'mekhela'; a.wrap = w; a.top = b; a.topStyle = 'blouse'; a.motif = mo; a.fabric = fab; }
     else if (style === 'sari') { const [m, w, b] = pick(rand, SARI); a.bottom = m; a.bottomStyle = 'sari'; a.wrap = w; a.top = b; a.topStyle = 'blouse'; }
     else if (style === 'salwar') { a.top = pick(rand, KURTI); a.topStyle = 'kurta'; a.bottom = pick(rand, SALWAR); a.bottomStyle = 'pants'; if (chance(rand, 0.6)) a.wrap = pick(rand, DUPATTA); }
     else if (style === 'uniform') { a.top = '#f2f2f0'; a.topStyle = 'uniform'; a.bottom = pick(rand, UNI_BOT); a.bottomStyle = chance(rand, 0.6) ? 'skirt' : 'pants'; a.bag = pick(rand, BAGS); a.bagStyle = 'back'; a.hairStyle = chance(rand, 0.6) ? 'long' : 'short'; }

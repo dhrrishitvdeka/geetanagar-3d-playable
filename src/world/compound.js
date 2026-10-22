@@ -1,8 +1,9 @@
 import * as THREE from 'three';
+import { scene } from '../core/context.js';
 import { GEO, clsAt, hAt, hash2, pointInPoly, rng } from '../core/geo.js';
 import { addCollider, mergeAdd, resample } from './geom.js';
 import { laneWidth } from './streets.js';
-import { HAT, MAINP, MAIN_JUNC, NRM, RF, edgeKind, hw, nearestOnMain } from './mainroad.js';
+import { HAT, MAINP, MAIN_JUNC, NRM, RF, buildFootRails, edgeKind, hw, nearestOnMain } from './mainroad.js';
 import { TEX, canvasTex, speckle } from './materials.js';
 import OVERRIDES from '../../data/buildings_overrides.json';
 
@@ -216,6 +217,26 @@ function laneRun(A, pts, s, len, st, old = false) {
   }
 }
 
+// bougainvillea spilling over about one wall piece in seven (Street View, Mar 2026): clumps of soft pink or magenta and green blobs on the wall top.
+// One instanced mesh; the blob geometry is jittered like the median shrubs in mainroad.js.
+function buildBougainvillea() {
+  const r = rng(616), bg = new THREE.IcosahedronGeometry(0.5, 2), pp = bg.attributes.position, d = new THREE.Object3D(), list = [];
+  for (let k = 0; k < pp.count; k++) { const f = 0.75 + 0.5 * Math.abs(Math.sin(pp.getX(k) * 9.1 + pp.getY(k) * 7.3 + pp.getZ(k) * 5.7)); pp.setXYZ(k, pp.getX(k) * f, pp.getY(k) * f, pp.getZ(k) * f); }
+  bg.computeVertexNormals();
+  const PINK = ['#c2457e', '#d4619a', '#b3366f', '#e07aa8'].map(c => new THREE.Color(c)), GREEN = ['#3f6a2a', '#4f7a34', '#56803a'].map(c => new THREE.Color(c));
+  for (const f of WALL_FACES) {
+    if (r() > 0.15 || f.q.length < 2) continue;
+    const n = 3 + Math.floor(r() * 4), k0 = Math.floor(r() * (f.q.length - 1)), flowering = r() < 0.75;
+    for (let b = 0; b < n; b++) {
+      const k = Math.min(f.q.length - 2, k0 + (b > 2 ? 1 : 0)), t = r(), x = f.q[k][0] + (f.q[k + 1][0] - f.q[k][0]) * t, y = f.q[k][1] + (f.q[k + 1][1] - f.q[k][1]) * t, nn = f.n[k], sz = 0.35 + r() * 0.3, pal = flowering && r() < 0.8 ? PINK : GREEN;
+      d.position.set(x + nn[0] * (r() - 0.5) * f.t, hAt(x, y) + f.h + 0.1 + sz * 0.3, -(y + nn[1] * (r() - 0.5) * f.t)); d.scale.set(sz * (1 + r() * 0.5), sz * (0.55 + r() * 0.4), sz * (1 + r() * 0.5)); d.rotation.set(r() * 0.4, r() * 6, r() * 0.4); d.updateMatrix();
+      list.push([d.matrix.clone(), pal[Math.floor(r() * pal.length)]]);
+    }
+  }
+  if (!list.length) return;
+  const im = new THREE.InstancedMesh(bg, new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.95 }), list.length); im.name = 'bougainvillea';
+  list.forEach(([m, c], i) => { im.setMatrixAt(i, m); im.setColorAt(i, c); }); im.receiveShadow = true; scene.add(im);
+}
 export function buildCompoundWalls() {
   const t0 = performance.now(), A = { pl: acc(), br: acc(), gt: acc() };
   const st = { runs: 0, pieces: 0, segments: 0, gates: 0, open: 0, booths: 0, len: { N: 0, S: 0 }, skip: {}, inSkip: 0, shopBehind: 0 };
@@ -378,6 +399,8 @@ export function buildCompoundWalls() {
   st.ms = Math.round(performance.now() - t0);
   st.lanes = buildLaneWalls(GEO.roads.map(r => ({ P: resample(r.p, 2), w: laneWidth(r), name: r.name })).filter(l => l.P.length >= 2));
   console.info(`[compound] ${st.runs} runs, ${st.pieces} wall pieces, ${st.segments} segments, wall length N ${st.len.N.toFixed(0)} m / S ${st.len.S.toFixed(0)} m, ${st.gates} gates (${st.open} open), ${st.booths} gatehouses; segments inside skip zones: ${st.inSkip}; segments with commercial pixels 1-4 m behind: ${st.shopBehind}; skipped samples ${JSON.stringify(st.skip)}; ${st.ms} ms`);
+  buildBougainvillea();
+  buildFootRails(GATE_POSTS); // the raised footpaths' railing opens at the gates on the road, so it waits for the full list
   return st;
 }
 export { WALL_FACES, GATE_POSTS, PIL };

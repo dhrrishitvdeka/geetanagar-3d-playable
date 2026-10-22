@@ -620,11 +620,11 @@ function initQuests() {
   try { spawnNamedNPCs(); } catch (err) { console.error('[quests] spawnNamedNPCs failed', err); }
   try { initShopkeepers(); } catch (err) { console.error('[quests] shopkeepers failed', err); }
   try { initFriends(); setGreeter(passGreeting); initRoutines(); initSoundscape(); } catch (err) { console.error('[quests] friends and routines failed', err); }
-  const MEK = [['#d6b25e', '#e2c57a', '#a01e2c'], ['#efe7d2', '#f2ebd8', '#b3202e']];
+  const MEK = [['#cdae6c', '#d8bd7f', '#a3172b'], ['#efe6cf', '#f3ecd9', '#b3202e']]; // muga and pat silk, the blouse matches the motif
   addSpot(DANCE.x, DANCE.y, BIHU_AT, 18, () => Array.from({ length: 8 }, (_, k) => {
     const a = k / 8 * Math.PI * 2, woman = k % 2 === 0, [m, w, b] = MEK[(k >> 1) % 2];
     return { role: woman ? 'mekhela' : 'commuter', x: DANCE.x + Math.cos(a) * DANCE.r, y: DANCE.y + Math.sin(a) * DANCE.r, heading: a + Math.PI / 2, behavior: 'dance', title: 'Bihu dancer',
-      anchor: { ...DANCE }, appearance: woman ? { female: true, hairStyle: 'bun', topStyle: 'blouse', top: b, bottomStyle: 'mekhela', bottom: m, wrap: w, motif: b, bag: null, umbrella: null, phone: false }
+      anchor: { ...DANCE }, appearance: woman ? { female: true, hairStyle: 'bun', topStyle: 'blouse', top: b, bottomStyle: 'mekhela', bottom: m, wrap: w, motif: b, fabric: 'silk', bag: null, umbrella: null, phone: false }
         : { female: false, hairStyle: 'short', topStyle: 'kurta', top: '#f1e6c8', bottomStyle: 'dhoti', bottom: '#f4efe2', gamosa: true, hat: 'japi', bag: null, umbrella: null, phone: false },
       def: { chat: [[woman ? 'Bihu-r xubhessa! Come, dance! It is only three steps, then you sway.' : 'Hold the gamosa like this, and when the dhol goes fast, so do you!']] } };
   }), 120, danceOn);
