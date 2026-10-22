@@ -43,7 +43,7 @@ export class MeshBuilder {
     const u = [Math.cos(ang), Math.sin(ang)], v = [-Math.sin(ang), Math.cos(ang)];
     this.box([x, y], u, v, -w / 2, w / 2, -d / 2, d / 2, z0, z1, col, faces, gz);
   }
-  mesh(mat, { cast = true, receive = true, add = true, noMerge = false } = {}) {
+  mesh(mat, { cast = true, receive = true, add = true } = {}) {
     if (!this.idx.length) return null;
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3));
@@ -53,7 +53,7 @@ export class MeshBuilder {
     g.setAttribute('aH', new THREE.Float32BufferAttribute(this.h, 1));
     g.setIndex(this.verts > 65535 ? new THREE.Uint32BufferAttribute(this.idx, 1) : new THREE.Uint16BufferAttribute(this.idx, 1));
     g.computeBoundingSphere();
-    const m = new THREE.Mesh(g, mat); if (noMerge) m.userData.noMerge = true; m.castShadow = cast; m.receiveShadow = receive; if (add) scene.add(m);
+    const m = new THREE.Mesh(g, mat); m.castShadow = cast; m.receiveShadow = receive; if (add) scene.add(m);
     return m;
   }
 }
