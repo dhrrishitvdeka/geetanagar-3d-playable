@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { GEO, MANDIR, hAt, rng } from '../core/geo.js';
+import { GEO, MANDIR, clsAt, hAt, rng } from '../core/geo.js';
 import { flushRailings, mergeAdd, normalsOf, railing, resample, strip } from './geom.js';
 import { M } from './materials.js';
 import { scene } from '../core/context.js';
@@ -197,11 +197,14 @@ const MEDIAN_TREES = [];
 // (gatePosts comes from compound.js, passed in so this file never imports it)
 function buildFootRails(gatePosts) {
   const gates = gatePosts.filter(g => !g.lane);
-  const open = m => RF.crossings.some(c => Math.abs(m[0] - c.x) < 1.6) || RF.bus_stops.some(b => Math.abs(m[0] - b.x) < 4) || gates.some(g => Math.hypot(m[0] - g.x, m[1] - g.y) < 1.8);
+  // a railing in front of a shop would wall its customers off the footpath: leave it out where commercial pixels (class 3, as compound.js tests) sit up to 9 m behind it
+  // (shops stand back behind a forecourt; the raster is speckled, so look along the road a step either way too)
+  const shopBehind = (m, s) => { const [, i] = nearestOnMain(m[0], m[1]), n = NRM[i]; for (const al of [-2.5, 0, 2.5]) for (let d = 1; d <= 9; d += 1) if (clsAt(m[0] + n[0] * s * d + n[1] * al, m[1] + n[1] * s * d - n[0] * al) === 3) return true; return false; };
+  const openAt = (m, s) => RF.crossings.some(c => Math.abs(m[0] - c.x) < 1.6) || RF.bus_stops.some(b => Math.abs(m[0] - b.x) < 4) || gates.some(g => Math.hypot(m[0] - g.x, m[1] - g.y) < 1.8) || shopBehind(m, s);
   for (const { s, a, b } of FOOT_RUNS) {
     if (b - a < 4) continue; // the end indices of a run sit at road level, so the railing keeps one step in from each
     const line = []; for (let i = a + 1; i <= b - 2; i++) { const off = asphHalf(i) + FP_W - 0.1; line.push([MAINP[i][0] + NRM[i][0] * s * off, MAINP[i][1] + NRM[i][1] * s * off]); }
-    railing(line, { h: 0.95, spacing: 2.4, base: FP_H, rails: [0.1, 0.96], post: 0.07, infill: 'railInfill', infillSpan: [0.1, 0.96], skip: open });
+    railing(line, { h: 0.95, spacing: 2.4, base: FP_H, rails: [0.1, 0.96], post: 0.07, infill: 'railInfill', infillSpan: [0.1, 0.96], skip: m => openAt(m, s) });
   }
   flushRailings();
 }
