@@ -76,14 +76,14 @@ function shoulder() {
   return maps(L);
 }
 // black-and-white kerb blocks, worn paint and grime at the foot. 512 x 64 = 2.4 m along (four 0.6 m blocks), v up the face
-function kerb(light = '#e4e1d8') {
+function kerb(light = '#e4e1d8', grime = 1) { // grime scales the mud gradient: the footpath's repainted face uses a light one
   const W = 512, H = 64, L = layers(W, H), r = rng(81);
   L.rough.fillStyle = grey(200); L.rough.fillRect(0, 0, W, H); if (L.bump) { L.bump.fillStyle = grey(128); L.bump.fillRect(0, 0, W, H); }
   for (let k = 0; k < 4; k++) { const x = k * 128; L.col.fillStyle = k % 2 ? '#1c1d1f' : light; L.col.fillRect(x, 0, 128, H); if (L.bump) { L.bump.fillStyle = grey(90); L.bump.fillRect(x, 0, 2, H); } }
   // chipped paint showing grey concrete
   for (let i = 0; i < 160; i++) { const x = r() * W, y = r() * H, s = 1 + r() * 6; L.col.fillStyle = `rgba(150,146,138,${0.5 + r() * 0.5})`; L.col.fillRect(x, y, s * 1.5, s); }
   // grime and splashed mud toward the road (low v) and dust on top
-  const gr = L.col.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, 'rgba(105,88,70,0.75)'); gr.addColorStop(0.45, 'rgba(105,88,70,0.15)'); gr.addColorStop(1, 'rgba(105,88,70,0.05)'); L.col.fillStyle = gr; L.col.fillRect(0, 0, W, H);
+  const gr = L.col.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, `rgba(105,88,70,${0.75 * grime})`); gr.addColorStop(0.45, `rgba(105,88,70,${0.15 * grime})`); gr.addColorStop(1, `rgba(105,88,70,${0.05 * grime})`); L.col.fillStyle = gr; L.col.fillRect(0, 0, W, H);
   noise(L.col, W, H, 3500, 82, ['rgba(90,74,58,0.5)', 'rgba(0,0,0,0.3)', 'rgba(255,255,255,0.15)'], 2);
   return maps(L);
 }

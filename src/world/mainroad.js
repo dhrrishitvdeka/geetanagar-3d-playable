@@ -83,7 +83,7 @@ const humpAt = f => { for (const b of SB) { const a = (f - b.bi) * 2.5; if (Math
 
 const KERB_GREEN_TO = -60; // median kerb is painted black-green west of this x
 function buildMain() {
-  const P = MAINP, asph = [], dust = [], kerb = [], kerbG = [], shoulder = [], med = [], pave = [], foot = [], sbump = [];
+  const P = MAINP, asph = [], dust = [], kerb = [], kerbG = [], shoulder = [], med = [], pave = [], foot = [], sbump = [], fkerb = [];
   for (const s of [1, -1]) {
     asph.push(strip(P, i => s * medHalf(P[i][0]), i => s * asphHalf(i), 0.06, 0.06, 6));
     for (const { bi } of SB) { // the speed breaker: ten slices across this carriageway, height 0.07 sin(pi t) over its 3.5 m
@@ -101,9 +101,9 @@ function buildMain() {
       if (kind === 'kerb') {
         // raised slab footpath: painted road face, slab top, back face; the railing is added later by buildFootRails (it needs the gates)
         const fh = i => fpHeightAt(s, a + i);
-        kerb.push(strip(Q, i => s * o(i), i => s * o(i), 0.04, fh, 2.4, true));
+        fkerb.push(strip(Q, i => s * o(i), i => s * o(i), 0.04, fh, 2.4, true));
         foot.push(strip(Q, i => s * o(i), i => s * (o(i) + FP_W), fh, fh, 1.0));
-        kerb.push(strip(Q, i => s * (o(i) + FP_W), i => s * (o(i) + FP_W), fh, 0.0, 2.4, true));
+        fkerb.push(strip(Q, i => s * (o(i) + FP_W), i => s * (o(i) + FP_W), fh, 0.0, 2.4, true));
         shoulder.push(strip(Q, i => s * (o(i) + FP_W), i => s * (H(i) + 0.8), 0.04, 0.04, 4));
         FOOT_RUNS.push({ s, a, b });
       } else if (kind === 'culvert' || kind === 'mandir') {
@@ -139,7 +139,7 @@ function buildMain() {
     // median railing: maroon posts, black verticals between a bottom and a top rail (Street View x -145 and x -27, Mar 2026)
     railing(PM.slice(1, -1).map(p => [p[0], p[1]]), { h: 0.95, spacing: 2.5, base: MED_H, rails: [0.12, 0.95], post: 0.07, postMat: 'maroon', infill: 'railInfill', infillSpan: [0.12, 0.95] });
   }
-  mergeAdd(asph, M.asphalt); mergeAdd(dust, M.dust); mergeAdd(kerb.map(g => (g.index ? g.toNonIndexed() : g)), M.kerb); mergeAdd(kerbG.map(g => (g.index ? g.toNonIndexed() : g)), M.kerbGreen); mergeAdd(med, M.median); mergeAdd(shoulder, M.shoulder); mergeAdd(foot, M.footSlab); mergeAdd(sbump, M.speedBreaker); if (pave.length) mergeAdd(pave, M.paver);
+  mergeAdd(asph, M.asphalt); mergeAdd(dust, M.dust); mergeAdd(kerb.map(g => (g.index ? g.toNonIndexed() : g)), M.kerb); mergeAdd(kerbG.map(g => (g.index ? g.toNonIndexed() : g)), M.kerbGreen); mergeAdd(med, M.median); mergeAdd(shoulder, M.shoulder); mergeAdd(foot, M.footSlab); mergeAdd(fkerb.map(g => (g.index ? g.toNonIndexed() : g)), M.footKerb); mergeAdd(sbump, M.speedBreaker); if (pave.length) mergeAdd(pave, M.paver);
   // pink bougainvillea and green shrubs along both sides of the railing, small trees in the wide western stretch
   const r = rng(31), bush = [];
   for (const run of medRuns) for (let k = 1; k < run.length - 1; k++) {

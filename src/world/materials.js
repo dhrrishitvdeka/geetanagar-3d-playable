@@ -61,7 +61,7 @@ const TEX = {
   }),
 };
 // PBR-ish procedural sets (colour + roughness + bump) from road/textures.js
-const PBR = { asphalt: T.asphalt(), shoulder: T.shoulder(), kerb: T.kerb(), concrete: T.concrete(), brick: T.brick(), kerbGreen: T.kerb('#4d7348'), pole: T.concrete(131, '#b3afa6') };
+const PBR = { asphalt: T.asphalt(), shoulder: T.shoulder(), kerb: T.kerb(), concrete: T.concrete(), brick: T.brick(), kerbGreen: T.kerb('#4d7348'), footKerb: T.kerb('#f3f1ea', 0.3), pole: T.concrete(131, '#b3afa6') };
 const rep = (set, x, y) => { for (const k of ['map', 'roughnessMap', 'bumpMap']) if (set[k]) set[k].repeat.set(x, y); return set; };
 const M = {
   // world-UV strips use 1 unit = 6 m for asphalt, so the 8 m texture is scaled by 6/8
@@ -78,6 +78,7 @@ const M = {
   speedBreaker: new THREE.MeshStandardMaterial({ map: TEX.speedBreaker, roughness: 0.85, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 }),
   footSlab: new THREE.MeshStandardMaterial({ map: TEX.footSlab, roughness: 0.95, side: THREE.DoubleSide }),
   kerb: new THREE.MeshStandardMaterial({ ...PBR.kerb, bumpScale: 1, roughness: 1, side: THREE.DoubleSide }),
+  footKerb: new THREE.MeshStandardMaterial({ ...PBR.footKerb, color: new THREE.Color(1.3, 1.3, 1.3), emissive: new THREE.Color(1, 1, 1), emissiveMap: PBR.footKerb.map, emissiveIntensity: 0.45, bumpScale: 1, roughness: 1, side: THREE.DoubleSide }), // the footpath's painted face is 0.4 m tall and the south side's is always in shadow: fresher paint, lifted by its own map so the white blocks still read
   kerbGreen: new THREE.MeshStandardMaterial({ ...PBR.kerbGreen, bumpScale: 1, roughness: 1, side: THREE.DoubleSide }),
   concrete: new THREE.MeshStandardMaterial({ ...PBR.concrete, bumpScale: 1.5, roughness: 1 }),
   poleConcrete: new THREE.MeshStandardMaterial({ ...PBR.pole, bumpScale: 1, roughness: 1 }),
