@@ -21,7 +21,7 @@ const AXB = ['upperarm_r', 'upperarm_l', 'lowerarm_r', 'lowerarm_l', 'hand_r', '
 const CK = { stance: 0, arm: 1, shoulder: 2, finger: 3 };
 // per state: blend weight of each correction [stance, arm, shoulder, finger]
 const CW = { crouch: [0, 0.5, 0.5, 0.5], idle: [1, 1, 1, 0.55], talk: [1, 1, 1, 0.55], walk: [0.35, 0.7, 1, 0.55], run: [0, 0.3, 0.5, 0.3], sit: [0, 0.7, 1, 0.55], floor: [0, 0.5, 0.5, 0.5], wave: [0.5, 0, 0.3, 0.15], pray: [0.5, 0, 0.3, 0.15] }, CW_DEF = [0, 0.3, 0.5, 0.4];
-const _q = new THREE.Quaternion();
+const _q = new THREE.Quaternion(), MEK_STRIDE = 0.4, MEK_LEVEL = 0.9; // share of the stride a mekhela or sari wearer keeps (thigh swing is scaled by it, step length too)
 let TPL = null, HAIR = null, ready = false, loading = null;
 const hashStr = s => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
 const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
@@ -165,6 +165,8 @@ function buildClips(t, anim) {
   sample(t.clips.Sitting_Idle_Loop, 0); t.sitY = pel.matrixWorld.elements[13]; t.sitZ = pel.matrixWorld.elements[14];
   // where the hands hang in the idle pose: held props are designed there and mapped back to the bind pose (rigid on the hand bone)
   sample(t.clips.Idle_Loop, 0);
+  { const zl = ft[2].matrixWorld.elements[14], zr = ft[3].matrixWorld.elements[14], zm = (zl + zr) / 2; t.idleSplit = { l: zl - zm, r: zr - zm }; } // how far each foot stands ahead of the pair in the idle clip (it stands with one foot well forward)
+  t.idleQ = {}; for (const n of ['thigh_l', 'thigh_r', 'calf_l', 'calf_r']) t.idleQ[n] = B(n).quaternion.clone(); // the idle leg pose: a tube skirt's wearer swings the legs less than the clip does, see animate
   for (const s of ['l', 'r']) {
     const h = B('hand_' + s), W = h.matrixWorld.clone(); t.handIdle[s] = new THREE.Vector3().setFromMatrixPosition(W);
     t.Mhand[s] = t.Wb[t.bi['hand_' + s]].clone().multiply(W.invert());
@@ -296,6 +298,7 @@ function skirtPoint(t, o, a, v, out = 0) {
   const gr = o.grow || 0.03; t.sec(o.top, SEC); const ax0 = SEC.rx + gr, az0 = (SEC.zf - SEC.zb) / 2 + gr, cz = (SEC.zf + SEC.zb) / 2;
   const y = o.top + (o.hem - o.top) * v; t.sec(Math.max(y, SY0), SEC);
   const fl = o.flare * Math.pow(v, 0.7), rv = o.rv || [0.08, 0.35], mn = o.room && v > rv[0] ? o.room * smooth(rv[0], rv[1], v) : 0, back = mn ? (o.back ?? 0.06) * smooth(0.12, 0.7, v) : 0; // room: a minimum radius for loose skirts so the thighs have space; legs swing back further than forward, so a loose skirt hangs a little behind
+  if (o.hip) out += o.hip * smooth(0.12, 0.2, v) * (1 - smooth(0.3, 0.5, v)); // a swell over the hips: the thigh skin swings out under the cloth when the legs are levelled or shortened
   return [Math.sin(a) * (Math.max(ax0 + fl, SEC.rx + gr + 0.01, mn * 1.08) + out), y, cz - back + Math.cos(a) * (Math.max(az0 + fl, (SEC.zf - SEC.zb) / 2 + gr + 0.01, mn * (o.zk ?? 1)) + back + out)];
 }
 // weights for a skirt: pelvis, both thighs (so the middle of the front and back follows their average) and, low down, the calf on the vertex's own side
@@ -405,7 +408,7 @@ function buildDress(t, a) {
   const motif = bs === 'mekhela' || bs === 'sari' ? rgb(a.motif || '#a3172b') : null; // the woven motifs, their own colour (red or gold on silk), not the blouse's
   if (bs === 'mekhela' || bs === 'sari') {
     // a mekhela is a straight tube with the pleats (kochi) tucked at the front right; a sari hangs much the same below the waist
-    const o = { top: waist, hem: H * 0.045, flare: bs === 'mekhela' ? 0.05 : 0.07, col: bot, rim, thigh: 0.85, calf: 0.3, room: 0.235 * t.H / 1.81, rv: [0.03, 0.2], tw: [0, 0.4], back: 0.1, zk: 1.1, motif, cloth: true }; // room from just below the waist and the cloth following the thighs from the top: a tight tube still has to let a stride through
+    const o = { top: waist, hem: H * 0.045, flare: bs === 'mekhela' ? 0.05 : 0.07, col: bot, rim, thigh: 0.5, calf: 0, room: 0.235 * t.H / 1.81, rv: [0.03, 0.2], tw: [0, 0.4], back: 0, zk: 0.85, hip: 0.03, motif, cloth: true }; // a near-straight tube seen from the side: front-to-back room 0.85 and no backward shift (hem depth 1.13x the hip's at rest); the cloth follows the thighs half-way and not the calves, and the stride is shortened in animate
     addSkirt(cloth, t, o); addPleats(cloth, t, o);
   } else if (bs === 'skirt') addSkirt(acc, t, { top: waist, hem: H * (kid ? 0.35 : 0.3), flare: 0.12, col: bot, rim: [1, 1, 1], thigh: 0.4 });
   else if (bs === 'dhoti') addSkirt(acc, t, { top: waist, hem: H * 0.15, flare: 0.1, col: bot, rim: [1, 1, 1], thigh: 0.4, calf: 0.25, room: 0.22 * t.H / 1.81 });
@@ -535,7 +538,7 @@ function makeRealCharacter(appearance = {}, opts = {}) {
   function setAppearance(app) {
     const a = { ...DEF, ...app }, female = !!a.female; A = a;
     if (rig) rig.root.visible = false;
-    rig = rigOf(female ? 'female' : 'male'); rig.root.visible = true; rig.fresh = true; jm = sm = 0; pAir = pSit = false;
+    rig = rigOf(female ? 'female' : 'male'); rig.root.visible = true; rig.fresh = true; rig.mek = a.bottomStyle === 'mekhela' || a.bottomStyle === 'sari'; jm = sm = 0; pAir = pSit = false;
     sc = BASE_H * a.height / rig.t.H; pivot.scale.set(sc * (female ? 0.95 : 0.91) * (a.build || 1), sc, sc * 0.94);
     dress(rig, a, female);
     formal = a.topStyle === 'shirt' && a.bottomStyle === 'pants' && hashStr(a.top + a.bottom) % 2 === 0;
@@ -591,7 +594,7 @@ function makeRealCharacter(appearance = {}, opts = {}) {
       }
       // one cadence for every gait clip in the blend: stride (m per cycle) and natural rate (cycles per s), averaged by weight
       let ws = 0, strd = 0, nat = 0;
-      for (const n in SPEED_KEY) { const w = tw[n]; if (w > 0) { const d = dur(n); ws += w; strd += w * t.speed[SPEED_KEY[n]] * sc * d; nat += w / d; } }
+      for (const n in SPEED_KEY) { const w = tw[n]; if (w > 0) { const d = dur(n); ws += w; strd += w * t.speed[SPEED_KEY[n]] * sc * d * (rig.mek ? 0.5 : 1); nat += w / d; } } // shorter steps in a tube skirt: the cadence rises to keep the pace
       if (ws > 0.01) { nat /= ws; fq = Math.max(0.3, v) / (strd / ws); fq = Math.max(nat * 0.35, Math.min(nat * 1.9, fq)); rig.fq = fq; }
       ph = (ph + fq * dt) % 1;
     }
@@ -619,6 +622,11 @@ function makeRealCharacter(appearance = {}, opts = {}) {
     // the mixer only rewrites a bone whose animated value changed, so what we added last frame must be taken off again first
     const trk = rig.trk; for (let i = 0; i < trk.length; i++) { const k = trk[i]; if (k.on) { if (k.b.quaternion.equals(k.post)) k.b.quaternion.copy(k.pre); k.on = false; } }
     const touch = b => { let k = rig.trkOf.get(b); if (!k) { k = { b, pre: new THREE.Quaternion(), post: new THREE.Quaternion(), on: false }; rig.trkOf.set(b, k); trk.push(k); } if (!k.on) { k.on = true; k.pre.copy(b.quaternion); } };
+    // ----- a tube skirt shortens the stride: pull the thighs (and a little the knees) back toward the idle pose by the lost share, as the gait speeds up
+    if (rig.mek) {
+      const moving = smooth(0.15, 0.7, sp), kt = 1 - (1 - MEK_STRIDE) * moving, kc = 1 - 0.6 * moving;
+      if (moving > 0.001) for (const [n, k] of [['thigh_l', kt], ['thigh_r', kt], ['calf_l', kc], ['calf_r', kc]]) { const bb = rig.bn[n]; touch(bb); _q.copy(bb.quaternion); bb.quaternion.copy(t.idleQ[n]).slerp(_q, k); }
+    }
     // ----- corrections to the clips' stance, blended per state
     const hi = ((ent.Jog_Fwd_Loop ? ent.Jog_Fwd_Loop.w : 0) + (ent.Sprint_Loop ? ent.Sprint_Loop.w : 0)) / sum2;
     const key = state === 'walk' || state === 'run' ? (hi > 0.5 ? 'run' : 'walk') : state === 'kick' ? 'idle' : state, tg = CW[key] || CW_DEF, cw = rig.cw, kk = rig.cwSet ? Math.min(1, dt * 8) : 1; rig.cwSet = true;
@@ -645,6 +653,8 @@ function makeRealCharacter(appearance = {}, opts = {}) {
       R('spine_03', 'x', sg.lean * 0.018 * br * ik); R('neck_01', 'x', -sg.lean * 0.008 * br * ik);
       R('pelvis', 'z', 0.022 * Math.sin(bt * 0.42 + bph) * ik); R('spine_01', 'z', -0.015 * Math.sin(bt * 0.42 + bph) * ik);
     }
+    // a tube skirt: stand with the feet level, not one a stride ahead, or the cloth stretches between the legs like a gown seen from the side
+    if (rig.mek && ik > 0.01) { const L = 0.85, wl = ik * MEK_LEVEL; R('thigh_l', 'x', -sg.hip * t.idleSplit.l / L * wl); R('thigh_r', 'x', -sg.hip * t.idleSplit.r / L * wl); }
     if (pk > 0.01) { R('spine_01', 'x', sg.lean * 0.08 * pk); R('spine_03', 'x', sg.lean * 0.12 * pk); R('upperarm_r', 'x', sg.arm * 1.0 * pk); R('Head', 'x', -sg.lean * 0.2 * pk); }
     if (o.dance && (state === 'idle' || state === 'walk')) { // Bihu: arms up and out, wrists turning, hips swaying to the dhol
       dnT += dt; const sw = Math.sin(dnT * 4.2), up = 0.7 + 0.15 * Math.sin(dnT * 2.1);
