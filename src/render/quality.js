@@ -29,6 +29,6 @@ const isLow = () => QUALITY === 'low';
 function saveQuality(q) { try { localStorage.setItem(KEY, q); } catch (e) { /* storage blocked */ } }
 
 // haze density: thicker on Low so its shorter view distance (3.5 km) fades out instead of cutting off
-const fogFor = street => QUALITY === 'low' ? (street ? 0.0017 : 0.0006) : (street ? 0.0014 : 0.00035);
+const fogFor = street => QUALITY === 'low' ? (street ? 0.0017 : 0.0006) : (street ? 0.00085 : 0.00035);
 
 export { QUALITY, isLow, saveQuality, detect, fogFor };

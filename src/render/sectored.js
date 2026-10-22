@@ -8,12 +8,12 @@ import { scene } from '../core/context.js';
 const _white = new THREE.Color(1, 1, 1);
 class SectorSet {
   // n slices round the centre, inner: radius of the centre disc, pad: metres added to each slice's bounds
-  constructor(geo, mat, cap, { n = 8, inner = 16, pad = 2.5, colors = false } = {}) {
+  constructor(geo, mat, cap, { n = 8, inner = 16, pad = 2.5, colors = false, name = '' } = {}) {
     this.n = n; this.inner2 = inner * inner; this.pad = pad; this.cx = 0; this.cy = 0;
     this.k = new Int32Array(n + 1);
     this.meshes = [];
     for (let i = 0; i <= n; i++) {
-      const m = new THREE.InstancedMesh(geo, mat, cap); m.count = 0; m.visible = false;
+      const m = new THREE.InstancedMesh(geo, mat, cap); m.count = 0; m.visible = false; m.name = name ? `${name}#${i}` : '';
       if (colors) m.setColorAt(0, _white); // allocate instanceColor up front
       scene.add(m); this.meshes.push(m);
     }
@@ -43,12 +43,12 @@ class SectorSet {
 
 // static instances (nothing moves them after the build) bucketed into square map cells, one InstancedMesh per cell,
 // so a long row of small things along a road is culled cell by cell; items: [x, y, matrix, color?]
-function cellInstances(geo, mat, items, cell = 60) {
+function cellInstances(geo, mat, items, cell = 60, name = '') {
   const cells = new Map();
   for (const it of items) { const key = Math.floor(it[0] / cell) + ',' + Math.floor(it[1] / cell); let a = cells.get(key); if (!a) cells.set(key, a = []); a.push(it); }
   const out = [];
   for (const a of cells.values()) {
-    const m = new THREE.InstancedMesh(geo, mat, a.length);
+    const m = new THREE.InstancedMesh(geo, mat, a.length); m.name = name;
     a.forEach(([, , mx, c], i) => { m.setMatrixAt(i, mx); if (c) m.setColorAt(i, c); });
     m.computeBoundingSphere(); scene.add(m); out.push(m);
   }

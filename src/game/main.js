@@ -42,6 +42,7 @@ import { initAudio, setListener } from './audio.js';
 
 // ---------- Geetanagar: the game. Same world as the explorer, plus people, traffic, animals and things to do ----------
 setQuality(QUALITY);
+renderer.shadowMap.autoUpdate = false; // the shadow pass is redrawn on the frames the loop asks for (see shadowTick), not on every one
 function resize() { const w = stage.clientWidth, h = stage.clientHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); resizePost(w, h); }
 addEventListener('resize', resize); resize();
 
@@ -161,7 +162,7 @@ addEventListener('pagehide', () => { if (started && !transitioning) autosave(); 
 on('quest:completed', () => { if (started) autosave(); });
 
 // ---------- frame ----------
-let last = performance.now(), saveT = 0, busyPrev = false, grassT = 0;
+let last = performance.now(), saveT = 0, busyPrev = false, grassT = 0, shadowTick = 0;
 renderer.setAnimationLoop(now => {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   if (ready) {
@@ -195,9 +196,11 @@ renderer.setAnimationLoop(now => {
       }
     }
     const p = getPlayer();
-    if (started && nearDeck()) placeShadow(DECK.cx, -(DECK.cy - 260), 430); // from the terrace the shadows cover the whole view, as in the explorer
-    else if (started) placeShadow(p.x, -p.y, 90);
-    else placeShadow(TC.x, -TC.y, 150);
+    let jumped;
+    if (started && nearDeck()) jumped = placeShadow(DECK.cx, -(DECK.cy - 260), 430); // from the terrace the shadows cover the whole view, as in the explorer
+    else if (started) jumped = placeShadow(p.x, -p.y, 90);
+    else jumped = placeShadow(TC.x, -TC.y, 150);
+    if (jumped || ++shadowTick >= (QUALITY === 'high' ? 1 : 2)) { shadowTick = 0; renderer.shadowMap.needsUpdate = true; } // medium: every other frame (the pass is 43 % of the triangles)
     // the grass only needs refreshing every so often at vehicle speed
     const grassDue = !p.riding || (grassT += dt) >= 0.6; if (grassDue) grassT = 0;
     try { updateNearTrees(false); if (grassDue) updateGrass(); } catch (e) { /* vegetation failed to build */ }

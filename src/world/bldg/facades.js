@@ -207,6 +207,39 @@ function paintBlank(seed) {
 }
 
 // ---- roofs: weathered concrete slab, corrugated tin ----
+// ---- secondary side walls (not on a road, not the longest wall): one tile is 2 bays x 2 floors -
+// a small grilled window, a bathroom ventilator, a small window with a box grill, and plain plaster ----
+function paintSide(seed) {
+  const L = new Layers(SZ, SZ, K), r = rng(seed);
+  L.rect(0, 0, 1024, 1024, plaster);
+  const boxGrill = { c: '#dcd9d0', h: 0.92, p: 0, r: 0.5 }, frame = { c: '#4c3a2e', h: 0.42, p: 0, r: 0.55 };
+  for (let cy = 0; cy < 2; cy++) {
+    slabBand(L, cy);
+    for (let cx = 0; cx < 2; cx++) {
+      const x0 = cx * CELL, kind = cy * 2 + cx; // 0, 2: small window; 1: ventilator; 3: plain
+      if (kind === 0 || kind === 2) {
+        const wW = 0.95 * PX, x = x0 + (CELL - wW) / 2, yTop = yAt(cy, 2.1), ySill = yAt(cy, 1.0), wh = ySill - yTop;
+        ledgeShade(L, x - 30, x + wW + 30, yTop - 20, 28, 0.25);
+        L.rect(x - 8, yTop - 8, wW + 16, wh + 16, { c: '#e6e2d9', h: 0.36, p: 1, r: 0.93 });
+        glass(L, r, x, yTop, wW / 2, wh, kind === 0 ? 'curtain' : 'dark'); glass(L, r, x + wW / 2, yTop, wW / 2, wh, 'clear');
+        frameBox(L, x, yTop, wW, wh, 8, frame); L.rect(x + wW / 2 - 3, yTop, 6, wh, frame);
+        const gx = x - 12, gy = yTop - 12, gw = wW + 24, gh = wh + 20;
+        frameBox(L, gx, gy, gw, gh, 6, boxGrill); for (let i = gx + 22; i < gx + gw - 8; i += 22) L.rect(i, gy, 4, gh, boxGrill);
+        L.rect(x - 14, ySill + 6, wW + 28, 10, { c: '#dedad0', h: 0.72, p: 1, r: 0.93 });
+        streaks(L, r, x - 10, x + wW + 10, ySill + 16, CELL * 0.3, 0.22);
+      } else if (kind === 1) {
+        const vw = 0.6 * PX, vh = 0.45 * PY, vx = x0 + (CELL - vw) / 2, vy = yAt(cy, 2.2);
+        L.rect(vx - 8, vy - 8, vw + 16, vh + 16, { c: '#e6e2d9', h: 0.38, p: 1 }); glass(L, r, vx, vy, vw, vh, 'clear');
+        for (let i = 1; i < 4; i++) L.rect(vx, vy + i * vh / 4, vw, 4, { c: '#4a4f53', h: 0.8, p: 0 });
+        streaks(L, r, vx - 6, vx + vw + 6, vy + vh + 8, 120, 0.2);
+      }
+      streaks(L, r, x0 + 10, x0 + CELL - 10, cy * CELL + 30, CELL * 0.25, 0.12);
+    }
+  }
+  pipe(L, r, 760);
+  L.plasterPass(seed + 5, 1.3);
+  return L;
+}
 function paintSlab(seed) {
   const L = new Layers(512, 512), r = rng(seed), n = fbm(seed, 512, 512, 3, 5);
   L.rect(0, 0, 512, 512, { c: '#d6d3cc', h: 0.5, p: 1, r: 0.95 });
@@ -287,10 +320,11 @@ function facadeMat(t, opts) {
 // The six texture sets (about 2 s of drawing at High) are restored from IndexedDB when an earlier run stored them. The key covers
 // this file, tex.js, the rng source, the preset and the browser (render/texcache.js). Top-level await because facadeMaterials()
 // is synchronous and the read has to be done before it runs.
-const SETS = ['slab', 'tin', 'rcc', 'slide', 'assam', 'blank'];
+const SETS = ['slab', 'tin', 'rcc', 'slide', 'assam', 'blank', 'side'];
 const BUILD = { // name -> [painter, normal strength]; slab and tin first, as the drawing has always run
   slab: [() => paintSlab(41), 1.5], tin: [() => paintTin(43), 3],
   rcc: [() => paintRCC(11), 3], slide: [() => paintSlide(13), 3], assam: [() => paintAssam(17), 3], blank: [() => paintBlank(19), 2.5],
+  side: [() => paintSide(23), 3],
 };
 const KEY = texKey(`facades:${QUALITY}`, [SRC_FACADES, SRC_TEX, rng.toString(), QUALITY, SZ]);
 const T_READ = performance.now();
@@ -320,6 +354,7 @@ export function facadeMaterials() {
     slide: facadeMat(T.slide),
     assam: facadeMat(T.assam),
     blank: facadeMat(T.blank),
+    side: facadeMat(T.side),
     roof: new THREE.MeshStandardMaterial({ map: slab.map, normalMap: slab.normal, vertexColors: true, roughness: 0.95, side: THREE.DoubleSide }),
     tin: new THREE.MeshStandardMaterial({ map: tin.map, normalMap: tin.normal, vertexColors: true, roughness: 0.55, metalness: 0.35, side: THREE.DoubleSide }),
     trim: patchFacade(new THREE.MeshStandardMaterial({ map: slab.map, vertexColors: true, roughness: 0.92 }), { grime: 1, paintMask: false }),

@@ -74,6 +74,11 @@ function buildOuter() {
   };
   gmat.customProgramCacheKey = () => 'geet-outer-ground';
   const m = new THREE.Mesh(geo, gmat); m.receiveShadow = true; scene.add(m);
+  // horizon: the 9 km square ends in a visible edge on high, where the far plane reaches 9.5 km; a flat forest-floor ring out to 9 km sits 40 m below
+  // the square's mean edge height, and the fog hides the step between them
+  { let sum = 0, n = 0; for (let k = 0; k <= 64; k++) { const t = -S / 2 + (k / 64) * S; for (const [x, y] of [[t, -S / 2], [t, S / 2], [-S / 2, t], [S / 2, t]]) { sum += outerH(x, y); n++; } }
+    const ring = new THREE.Mesh(new THREE.RingGeometry(S / 2, S, 64, 1), new THREE.MeshStandardMaterial({ color: forest, roughness: 1 }));
+    ring.rotation.x = -Math.PI / 2; ring.position.y = sum / n - 40; ring.name = 'horizon ring'; scene.add(ring); }
 
   // city blocks continuing in every direction past the traced area, in neighbourhood clusters
   const r = rng(404), boxes = [];
@@ -99,8 +104,8 @@ function buildOuter() {
     boxes.length = 0; boxes.push(...kb); OUTER_TREES.length = 0; OUTER_TREES.push(...kt);
   }
   const dm = new THREE.Object3D(), geoB = new THREE.BoxGeometry(1, 1, 1); geoB.translate(0, 0.5, 0);
-  const walls = new THREE.InstancedMesh(geoB, new THREE.MeshStandardMaterial({ color: '#fff', roughness: 0.9 }), boxes.length);
-  const roofs = new THREE.InstancedMesh(geoB, new THREE.MeshStandardMaterial({ color: '#fff', roughness: 0.85 }), boxes.length * 2);
+  const walls = new THREE.InstancedMesh(geoB, new THREE.MeshStandardMaterial({ color: '#fff', roughness: 0.9 }), boxes.length); walls.name = 'outer house walls';
+  const roofs = new THREE.InstancedMesh(geoB, new THREE.MeshStandardMaterial({ color: '#fff', roughness: 0.85 }), boxes.length * 2); roofs.name = 'outer house roofs';
   const WC = ['#ddd5c4', '#d2c7b2', '#c9cfcb', '#e0cdb3', '#c6bfb2', '#e2c4b0', '#d3d8d6', '#cfc39a', '#c9d2b4', '#e3d9c9'].map(x => new THREE.Color(x));
   // roofs: weathered concrete mostly, then painted tin sheets (rust red, blue, green) on the single-storey houses
   const RC = [['#8d8a83', 30], ['#7d7a73', 20], ['#a29d92', 15], ['#8a5440', 10], ['#5f7387', 8], ['#5e7458', 7], ['#9b4a3a', 6], ['#6b6b6b', 4]];

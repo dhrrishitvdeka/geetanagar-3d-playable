@@ -5,6 +5,7 @@ import { ASSET, modelParts } from './assets.js';
 import { inDeck, inViewWedge, sightTop } from '../world/deck.js';
 import { blockedBySeg } from '../world/geom.js';
 import { MEDIAN_TREES } from '../world/mainroad.js';
+import { gridNearest } from '../world/road/mainidx.js';
 import { EXTRA_TREES } from '../world/streetlife.js';
 import { PARK_TREES } from '../world/streets.js';
 import { TD, TW } from '../world/terrain.js';
@@ -13,8 +14,9 @@ import { bakeImpostor, makeImpostorMesh } from './impostor.js';
 import { BUILDERS, NVAR, materials } from './palms.js';
 import { VEG_U, patchVeg, tickVeg, vegDepth } from './wind.js';
 import { noiseAt } from './noise.js';
-import { FOREST_POLY, inForestPoly, inMandirClear, onUntracedRoad, quality } from './zones.js';
+import { FOREST_POLY, forestAmt, inForestPoly, inMandirClear, onUntracedRoad, quality } from './zones.js';
 import { SectorSet } from '../render/sectored.js';
+import { QUALITY } from '../render/quality.js';
 
 // ---------- trees ----------
 // Broadleaf trees (EZ-Tree models standing in for rain tree, mango, jackfruit and the pink-flowering median trees):
@@ -43,8 +45,9 @@ const PLANT_SLICES = { n: 6, inner: 30 };
 const NEAR_CELL = 32, nearGrid = new Map();
 let lastPlantAt = null;
 
-const mainPts = GEO.main;
-function distMain(x, y) { let b = 1e9; for (const p of mainPts) { const d = (p[0] - x) ** 2 + (p[1] - y) ** 2; if (d < b) b = d; } return Math.sqrt(b); }
+const mainPts = GEO.main, nearMain = gridNearest(mainPts); // the same vertices as before (not MAINP), so the tree layout does not change
+// distance to the main road, 99 beyond 20 m (only 'within 20 m' is asked)
+function distMain(x, y) { const i = nearMain(x, y, 20); return i < 0 ? 99 : Math.hypot(mainPts[i][0] - x, mainPts[i][1] - y); }
 const pick = (r, table) => { let u = r() * table.reduce((a, b) => a + b[1], 0); for (const [k, w] of table) { u -= w; if (u <= 0) return k; } return table[0][0]; };
 const MIX = {
   forest: [['mango', 30], ['rain', 22], ['jack', 32], ['bamboo', 9], ['areca', 7]],
@@ -73,7 +76,7 @@ function collectTrees() {
   for (let i = 0; i < 140000; i++) {
     const x = HG.x0 + r() * TW, y = HG.y0 + r() * TD, h = hAt(x, y), c = clsAt(x, y);
     if (c !== 0 && c !== 9) continue;
-    const onHill = h > 4, forest = onHill || inForestPoly(x, y), outside = c === 9;
+    const fa = forestAmt(x, y, h), forest = fa >= 1 || (fa > 0 && hash2(x * 1.7, y * 2.3) < fa), outside = c === 9; // a mixed edge over ~3 m of height, not a line
     const dm = forest ? 99 : distMain(x, y), road = dm < 20 && !outside;
     // groves and gardens cluster: a slow noise modulates density so trees gather instead of spreading evenly
     const grove = 0.35 + 1.3 * noiseAt(0, x / 140 + 0.2, y / 140 + 0.6);
@@ -132,10 +135,10 @@ function buildTreeMeshes() {
       nearSets[v] = mp.parts.map(p => {
         const leaf = isLeaf(p);
         const mat = leaf
-          ? patchVeg(new THREE.MeshStandardMaterial({ map: leafTex[v], alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.78 }), { ...wind, flutter: 0.05, foliage: { center, radius, mix: 0.65, ao: 0.45 }, upNormals: true })
+          ? patchVeg(new THREE.MeshStandardMaterial({ map: leafTex[v], alphaTest: 0.5, alphaToCoverage: QUALITY !== 'low', side: THREE.DoubleSide, roughness: 0.78 }), { ...wind, flutter: 0.05, foliage: { center, radius, mix: 0.65, ao: 0.45 }, upNormals: true })
           : patchVeg(new THREE.MeshStandardMaterial({ map: ASSET.bark, normalMap: ASSET.barkN, color: bark, roughness: 0.95 }), wind);
         // sliced round the camera so the slices out of view are culled (leaf slices carry the per-tree tint)
-        const im = new SectorSet(p.geo, mat, Math.max(...Object.values(QP).map(q => q.cap)), { colors: leaf }); im.castShadow = true; im.receiveShadow = true;
+        const im = new SectorSet(p.geo, mat, Math.max(...Object.values(QP).map(q => q.cap)), { colors: leaf, name: `tree:${v}:${leaf ? 'leaf' : 'bark'}` }); im.castShadow = true; im.receiveShadow = true;
         im.customDepthMaterial = leaf ? vegDepth(leafTex[v], { ...wind, flutter: 0.05 }) : vegDepth(null, wind, 0);
         im.leaf = leaf;
         return im;
@@ -152,7 +155,7 @@ function buildTreeMeshes() {
         dm.position.set(t.x, t.h - 0.25, -t.y); dm.rotation.set(0, t.yaw, 0); dm.scale.set(sc * t.sx, sc * t.sy, sc * t.sx); dm.updateMatrix();
         im.setMatrixAt(i, dm.matrix); im.setColorAt(i, t.tint);
       });
-      im.count = list.length; im.userData.nInner = nInner; im.userData.nAll = list.length; scene.add(im); imps[v] = im;
+      im.name = `impostor:${v}`; im.count = list.length; im.userData.nInner = nInner; im.userData.nAll = list.length; scene.add(im); imps[v] = im;
     }
   }
   // yard plants: per species and variant, a near (detailed) and far (simple) instanced pair
@@ -163,7 +166,7 @@ function buildTreeMeshes() {
     const set = plantSets[sp + v] = {};
     for (const [lod, detail] of [['near', true], ['far', false]]) {
       const g = BUILDERS[sp](seed, detail);
-      const tr = new SectorSet(g.trunk, M[sp].trunk, n, PLANT_SLICES), lf = new SectorSet(g.leaf, M[sp].leaf, n, PLANT_SLICES);
+      const tr = new SectorSet(g.trunk, M[sp].trunk, n, { ...PLANT_SLICES, name: `plant:${sp}${v}:${lod}:trunk` }), lf = new SectorSet(g.leaf, M[sp].leaf, n, { ...PLANT_SLICES, name: `plant:${sp}${v}:${lod}:leaf` });
       lf.customDepthMaterial = M[sp].depth;
       for (const m of [tr, lf]) { m.castShadow = lod === 'near' || sp === 'coconut'; m.receiveShadow = true; }
       set[lod] = [tr, lf];
@@ -181,7 +184,7 @@ function updateNearTrees(force) {
   const q = quality(), P = QP[q];
   if (q !== lastQ) {
     lastQ = q; force = true;
-    for (const v in imps) { const im = imps[v]; im.castShadow = P.shadows === true; im.userData.setFast(P.fast); im.count = im.userData.nAll; }
+    for (const v in imps) { const im = imps[v]; im.castShadow = false; im.userData.setFast(P.fast); im.count = im.userData.nAll; }
     for (const v in nearSets) for (const im of nearSets[v]) im.castShadow = !!P.shadows;
     for (const id in plantSets) for (const m of plantSets[id].near) m.castShadow = !!P.shadows;
     for (const id in plantSets) for (const m of plantSets[id].far) m.castShadow = P.shadows === true && id.startsWith('coconut');
