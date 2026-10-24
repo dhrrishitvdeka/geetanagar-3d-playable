@@ -9,6 +9,8 @@ screenshots/
 pipeline/
 docs/
 NOTES.md
+plan.md
+TASKS.md
 vite.verify.config.js
 .claude/
 .env

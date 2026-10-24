@@ -12,7 +12,7 @@ async function loadAssets() {
   const names = ['oak_color_1k.jpg', 'oak_normal_1k.jpg', 'birch_color_1k.jpg', 'oak_color.png', 'ash_color.png', 'aspen_color.png', 'grass.jpg', 'dirt_color.jpg', 'dirt_normal.jpg'];
   const t = await Promise.all(names.map((n, i) => tex('assets/' + n, !/normal/.test(n))));
   [ASSET.bark, ASSET.barkN, ASSET.birch, ASSET.leafOak, ASSET.leafAsh, ASSET.leafAspen, ASSET.grass, ASSET.dirt, ASSET.dirtN] = t;
-  // grass.glb is no longer loaded: near grass is procedural (veg/grass.js)
+  // near grass is procedural (veg/grass.js), so no grass model is loaded
   [ASSET.trees, ASSET.flowerW, ASSET.flowerY] = await Promise.all(['trees.glb', 'flower_white.glb', 'flower_yellow.glb'].map(glb));
   console.info('missing assets:', JSON.stringify(Object.entries(ASSET).filter(([k, v]) => !v).map(([k]) => k)));
   // ambient light now comes from the physical sky (world/sky.js); env.exr is kept for a later night/overcast mode

@@ -17,7 +17,7 @@ Only assets that allow free use (CC0 / MIT) belong in this project. Items marked
 | `trees.glb` | Baked from EZ-Tree presets (THREE.GLTFExporter r167) | MIT (generator) |
 | `oak_color_1k.jpg`, `oak_normal_1k.jpg`, `birch_color_1k.jpg` | Bark textures shipped with EZ-Tree, originally Poly Haven | CC0 (**verify** exact Poly Haven pages) |
 | `oak_color.png`, `ash_color.png`, `aspen_color.png` | Leaf cards shipped with EZ-Tree | **verify** (EZ-Tree repo is MIT; upstream origin unrecorded) |
-| `grass.glb`, `flower_white.glb`, `flower_yellow.glb` | Same filenames as EZ-Tree's demo assets (Blender glTF exporter 4.2) | **verify** |
+| `flower_white.glb`, `flower_yellow.glb` | Same filenames as EZ-Tree's demo assets (Blender glTF exporter 4.2) | **verify** |
 | `grass.jpg`, `dirt_color.jpg`, `dirt_normal.jpg` | Same filenames as EZ-Tree's demo assets | **verify** |
 | `env.exr` | Poly Haven HDRI (512×256, DWAB) | CC0 (**verify** which HDRI) |
 | `chars/male.glb`, `chars/female.glb`, `chars/hair.glb` | Universal Base Characters (Standard) by Quaternius, https://quaternius.itch.io/universal-base-characters. Bodies, eyes, eyebrows and hairstyles, textures downscaled and repacked by `pipeline/chars_build.mjs` | CC0 |

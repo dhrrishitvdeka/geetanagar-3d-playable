@@ -22,10 +22,17 @@ Add `?autostart` to the address to skip the title menu, or `?fps` for a frame-ra
 
 ## What's in it
 
-- **The neighbourhood.** About 1,500 buildings from the real footprints, with shopfronts, compound walls and gates, posters and
-  painted ads, potted plants on the walls, DTH dishes and washing on the roofs, the field, the Children's Park, the mandir and
-  the View point on the hill.
-- **People who live there.** Shopkeepers behind their counters, hawkers calling out, regulars who leave their gates in the morning
+- **The neighbourhood.** About 1,750 buildings from the real footprints: long traced blocks are split into rows of separate
+  houses, side walls carry their own small windows, vents and balconies, and 3-6 storey flats line Mother Teresa Rd. Shopfronts
+  with bilingual English and Assamese signboards, compound walls and gates with bougainvillea, posters and painted ads, DTH
+  dishes and washing on the roofs, the field with its high mast, the Children's Park, the mandir, the namghars and the View
+  point on the hill.
+- **The road.** Mother Teresa Rd as it is on the ground: raised slab footpaths with black-and-white kerbs that step down at the
+  ends, railings that open at shopfronts, gates and the crossings, a median with gaps where people cross, a speed breaker by the
+  field, potholes and repair patches, and cable tangles on the lane poles.
+- **People who live there.** Women in mekhela sador (a straight mekhela with tucked pleats, a woven red border, the sador over
+  the left shoulder, muga and pat silk with a sheen, and gold bangles and a flower in the hair for Bihu), men with gamosas,
+  chappals on everyone's feet. Shopkeepers behind their counters, hawkers calling out, regulars who leave their gates in the morning
   to catch the bus, go to school or do the shopping, and come home in the evening. Elders sit at the namghar for the evening
   kirtan. Walkers keep to the footpath, wait for a gap in the traffic, stop to watch the football and remember if you bump them.
 - **Friendships.** Talk to people every day, help them and bring them things they like: they greet you by name, give you a
@@ -37,7 +44,7 @@ Add `?autostart` to the address to skip the title menu, or `?fps` for a frame-ra
 - **Sound.** Synthesised in the browser: temple bells, conch shells at dawn and dusk, pressure cookers at lunchtime, school
   bells, kirtan, the tea stall, horns and the dhol.
 - **A day.** The clock runs from 6:30 am to 6 pm, and the town changes with it: the morning rush, the quiet midday heat, the
-  busy evening.
+  busy evening. Exposure follows the sun, and the green hills around Guwahati fade into the haze on the horizon.
 
 ## Controls
 
