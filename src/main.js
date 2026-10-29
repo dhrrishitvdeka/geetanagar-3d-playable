@@ -19,6 +19,9 @@ import { buildOuter } from './world/outer.js';
 import { buildKiosks } from './world/shops.js';
 import { buildHatigarh, buildPoles, buildTraffic } from './world/streetlife.js';
 import { buildStreets } from './world/streets.js';
+import { buildStreetscape } from './world/streetscape.js';
+import { buildLaneDetails } from './world/lanedetails.js';
+import { buildResidentialDetails } from './world/residential.js';
 import { buildCompoundWalls } from './world/compound.js';
 import { buildDetails } from './world/details.js';
 import { applyGroundTextures, paintGround } from './world/terrain.js';
@@ -56,7 +59,8 @@ let ready = false;
   // each builder is isolated: one failing module logs an error instead of leaving the world half-built
   const BOOT_MS = {}; window.__bootMs = BOOT_MS; // per-builder load time, for profiling
   const safe = (name, fn) => { const t0 = performance.now(); try { return fn(); } catch (err) { console.error(`[boot] ${name} failed`, err); } finally { BOOT_MS[name] = Math.round(performance.now() - t0); } };
-  safe('paintGround', paintGround); safe('applyGroundTextures', applyGroundTextures); safe('buildAll', buildAll); safe('buildStreets', buildStreets); safe('buildCompoundWalls', buildCompoundWalls); safe('buildDetails', buildDetails);
+  safe('paintGround', paintGround); safe('applyGroundTextures', applyGroundTextures); safe('buildAll', buildAll); safe('buildStreets', buildStreets); safe('buildStreetscape', buildStreetscape); safe('buildCompoundWalls', buildCompoundWalls); safe('buildDetails', buildDetails);
+  safe('buildLaneDetails', buildLaneDetails); safe('buildResidentialDetails', buildResidentialDetails);
   safe('buildMandir', buildMandir); safe('buildKiosks', buildKiosks); safe('buildDeck', buildDeck); safe('buildHatigarh', buildHatigarh);
   safe('buildTraffic', buildTraffic); safe('buildPoles', buildPoles); safe('buildOuter', buildOuter);
   const palms = safe('collectTrees', collectTrees) || [];

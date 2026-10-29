@@ -1,4 +1,5 @@
 node_modules/
+.pnpm-store/
 dist/
 pipeline/tiles_cache/
 *.log

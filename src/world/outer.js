@@ -42,6 +42,61 @@ function outerHProc(x, y) {
 function urban(x, y) { const rr = Math.hypot(x, y); return Math.max(0, Math.min(1, (fbm(x / 420 + 7, y / 420 - 4) - 0.47) * 3.5)) * Math.exp(-rr / 2600); }
 const OUTER_TREES = []; // [x, y, h, species, size] -> impostors in veg/trees.js
 
+// Pure planning helpers. These rows suggest a plausible city fabric outside the surveyed map;
+// they are procedural scenery, not claimed street positions or additional mapped geography.
+function outerPlanHash(x, y, salt = 0) {
+  const n = Math.sin(x * 127.1 + y * 311.7 + salt * 74.7) * 43758.5453;
+  return n - Math.floor(n);
+}
+function outerFootprintRadius(width, depth) { return Math.hypot(width, depth) / 2; }
+function outerPieceTransform(b, ox, elevation, oz, width, height, depth) {
+  const c = Math.cos(b.angle), s = Math.sin(b.angle);
+  return { position: [b.x + ox * c + oz * s, b.ground + elevation, -b.y - ox * s + oz * c],
+    scale: [width, height, depth], angle: b.angle };
+}
+function planOuterBuildings({ bounds, heightAt, densityAt, quality = 'high', limit = 7000 }) {
+  const all = [], occupied = new Map(), tile = 144, cell = 48;
+  const distance = (x, y) => Math.hypot(Math.max(bounds.x0 - x, 0, x - bounds.x1), Math.max(bounds.y0 - y, 0, y - bounds.y1));
+  // Generate the same full layout for all presets, then thin it. Occupancy never depends on quality.
+  for (let ty = -16; ty <= 15; ty++) for (let tx = -16; tx <= 15; tx++) {
+    const cluster = outerPlanHash(tx, ty, 1);
+    const angle = (cluster > 0.5 ? Math.PI / 2 : 0) + (outerPlanHash(tx, ty, 2) - 0.5) * 0.22;
+    const c = Math.cos(angle), s = Math.sin(angle);
+    for (let lane = 0; lane < 2; lane++) for (let plot = 0; plot < 6; plot++) for (const side of [-1, 1]) {
+      const id = `${tx}:${ty}:${lane}:${plot}:${side}`, seed = tx * 31 + plot * 3 + side + lane * 19;
+      const random = salt => outerPlanHash(seed, ty, salt);
+      const width = 9 + random(3) * 7, depth = 8 + random(4) * 9;
+      const along = (plot - 2.5) * 21.5 + (random(5) - 0.5) * 1.8;
+      const across = (lane - 0.5) * 68 + side * (6 + depth / 2 + random(6) * 1.5);
+      const x = tx * tile + along * c - across * s, y = ty * tile + along * s + across * c;
+      const radius = outerFootprintRadius(width + 1.2, depth + 1.2), dist = distance(x, y);
+      if (Math.hypot(x, y) + radius > 2300 || dist < radius + 6) continue;
+      const ground = heightAt(x, y), density = densityAt(x, y);
+      if (!Number.isFinite(ground) || ground > 10 || random(7) > 0.10 + 0.90 * density) continue;
+      // Steep ground remains wooded rather than supporting floating or buried houses.
+      if ([[radius, 0], [-radius, 0], [0, radius], [0, -radius]].some(([dx, dy]) => Math.abs(heightAt(x + dx, y + dy) - ground) > 2.2)) continue;
+      const cx = Math.floor(x / cell), cy = Math.floor(y / cell);
+      let overlap = false;
+      for (let dx = -1; dx <= 1 && !overlap; dx++) for (let dy = -1; dy <= 1 && !overlap; dy++) {
+        for (const other of occupied.get(`${cx + dx},${cy + dy}`) || []) {
+          if (Math.hypot(x - other.x, y - other.y) < radius + other.radius + 1.5) { overlap = true; break; }
+        }
+      }
+      if (overlap) continue;
+      const floors = random(8) < 0.27 ? 1 : random(9) < 0.87 ? 2 + Math.floor(random(10) * 3) : 5;
+      const b = { id, x, y, ground, width, depth, radius, angle, floors, distance: dist,
+        pitched: floors === 1 && random(11) < 0.85, stepped: floors >= 3 && random(12) < 0.62,
+        detail: dist < 270, palette: Math.floor(cluster * 5), variation: random(13), rank: random(14) };
+      all.push(b);
+      const key = `${cx},${cy}`;
+      if (!occupied.has(key)) occupied.set(key, []);
+      occupied.get(key).push(b);
+    }
+  }
+  const keep = quality === 'low' ? 0.3 : quality === 'medium' ? 0.6 : 1;
+  return all.slice(0, limit).filter(b => b.rank < keep);
+}
+
 function buildOuter() {
   const q = quality(), S = 9000, N = q === 'low' ? 112 : 225, geo = new THREE.PlaneGeometry(S, S, N, N); geo.rotateX(-Math.PI / 2);
   const pos = geo.attributes.position, col = new Float32Array(pos.count * 3), c = new THREE.Color();
@@ -80,53 +135,101 @@ function buildOuter() {
     const ring = new THREE.Mesh(new THREE.RingGeometry(S / 2, S, 64, 1), new THREE.MeshStandardMaterial({ color: forest, roughness: 1 }));
     ring.rotation.x = -Math.PI / 2; ring.position.y = sum / n - 40; ring.name = 'horizon ring'; scene.add(ring); }
 
-  // city blocks continuing in every direction past the traced area, in neighbourhood clusters
-  const r = rng(404), boxes = [];
-  OUTER_TREES.length = 0;
-  for (let i = 0; i < 90000 && boxes.length < 7000; i++) {
-    const x = -2300 + r() * 4600, y = -2300 + r() * 4600, dist = rectDist(x, y);
-    if (dist < 4) continue;
-    const rr = Math.hypot(x, y); if (rr > 2300) continue;
-    const h = outerH(x, y), u = urban(x, y);
-    if (h > 10) { if (r() < 0.45) OUTER_TREES.push([x, y, h, r() < 0.4 ? 'jack' : r() < 0.6 ? 'mango' : 'rain', 8 + r() * 7]); continue; }
-    if (r() > 0.08 + 0.92 * u) { if (r() < 0.7) OUTER_TREES.push([x, y, h, r() < 0.45 ? 'mango' : r() < 0.6 ? 'rain' : 'jack', 7 + r() * 7]); continue; }
-    if (r() < 0.25) OUTER_TREES.push([x + (r() - 0.5) * 8, y + (r() - 0.5) * 8, h, r() < 0.6 ? 'mango' : 'jack', 6 + r() * 5]);
-    // floors: mostly 2-4, some single-storey Assam-type houses, a few 5-7 storey apartment blocks nearer the core
-    const fl = r() < 0.18 ? 1 : r() < 0.8 ? 2 + Math.floor(r() * 3) : 5 + Math.floor(r() * 3 * Math.exp(-rr / 1800));
-    boxes.push([x, y, h, 7 + r() * 9 + fl, 6 + r() * 8 + fl * 0.5, r() * Math.PI, fl]);
-  }
-  // keep load time and draw cost bounded: thin the groves evenly to at most 12k impostor trees
-  if (OUTER_TREES.length > 12000) { const keep = 12000 / OUTER_TREES.length; const kept = OUTER_TREES.filter(() => r() < keep); OUTER_TREES.length = 0; OUTER_TREES.push(...kept); }
-  // low keeps 30% and medium 60% of the outer ring, chosen by position hash so the result is the same on every load
   const keepF = q === 'low' ? 0.3 : q === 'medium' ? 0.6 : 1;
-  if (keepF < 1) {
-    const kb = boxes.filter(b => hash2(b[0], b[1]) < keepF), kt = OUTER_TREES.filter(t => hash2(t[0], t[1]) < keepF);
-    boxes.length = 0; boxes.push(...kb); OUTER_TREES.length = 0; OUTER_TREES.push(...kt);
+  const fullHouses = planOuterBuildings({ bounds: { x0: RX0, x1: RX1, y0: RY0, y1: RY1 }, heightAt: outerH, densityAt: urban });
+  const houses = fullHouses.filter(b => b.rank < keepF);
+  // Keep the existing tree-impostor contract, with house clearances so crowns do not emerge through roofs.
+  const houseGrid = new Map(), cell = 48;
+  for (const b of fullHouses) {
+    const key = Math.floor(b.x / cell) + ',' + Math.floor(b.y / cell);
+    if (!houseGrid.has(key)) houseGrid.set(key, []);
+    houseGrid.get(key).push(b);
   }
-  const dm = new THREE.Object3D(), geoB = new THREE.BoxGeometry(1, 1, 1); geoB.translate(0, 0.5, 0);
-  const walls = new THREE.InstancedMesh(geoB, new THREE.MeshStandardMaterial({ color: '#fff', roughness: 0.9 }), boxes.length); walls.name = 'outer house walls';
-  const roofs = new THREE.InstancedMesh(geoB, new THREE.MeshStandardMaterial({ color: '#fff', roughness: 0.85 }), boxes.length * 2); roofs.name = 'outer house roofs';
-  const WC = ['#ddd5c4', '#d2c7b2', '#c9cfcb', '#e0cdb3', '#c6bfb2', '#e2c4b0', '#d3d8d6', '#cfc39a', '#c9d2b4', '#e3d9c9'].map(x => new THREE.Color(x));
-  // roofs: weathered concrete mostly, then painted tin sheets (rust red, blue, green) on the single-storey houses
-  const RC = [['#8d8a83', 30], ['#7d7a73', 20], ['#a29d92', 15], ['#8a5440', 10], ['#5f7387', 8], ['#5e7458', 7], ['#9b4a3a', 6], ['#6b6b6b', 4]];
-  const roofCol = () => { let u = r() * 100; for (const [k, w] of RC) { u -= w; if (u <= 0) return new THREE.Color(k); } return new THREE.Color(RC[0][0]); };
-  let nr = 0;
-  boxes.forEach((b, i) => {
-    const H = b[6] * 3.1 + 0.5 + (b[6] === 1 ? 0.6 : 0);
-    dm.position.set(b[0], b[2] - 0.5, -b[1]); dm.rotation.set(0, b[5], 0); dm.scale.set(b[3], H, b[4]); dm.updateMatrix(); walls.setMatrixAt(i, dm.matrix);
-    walls.setColorAt(i, WC[Math.floor(r() * WC.length)].clone().multiplyScalar(0.92 + r() * 0.12));
-    const tin = b[6] === 1 && r() < 0.7;
-    const rc = tin ? new THREE.Color(['#8a5440', '#5f7387', '#9b4a3a', '#5e7458'][Math.floor(r() * 4)]) : roofCol();
-    dm.position.set(b[0], b[2] - 0.5 + H, -b[1]); dm.scale.set(b[3] + 0.3, tin ? 0.25 : 0.12, b[4] + 0.3); dm.updateMatrix(); roofs.setMatrixAt(nr, dm.matrix); roofs.setColorAt(nr++, rc);
-    // stair head-room / water-tank block on many flat roofs
-    if (!tin && b[6] > 1 && r() < 0.55) {
-      const ox = (r() - 0.5) * b[3] * 0.5, oz = (r() - 0.5) * b[4] * 0.5, c0 = Math.cos(b[5]), s0 = Math.sin(b[5]);
-      dm.position.set(b[0] + ox * c0 + oz * s0, b[2] - 0.5 + H, -b[1] - ox * s0 + oz * c0); dm.scale.set(3 + r() * 2, 2.4, 3 + r() * 2); dm.updateMatrix();
-      roofs.setMatrixAt(nr, dm.matrix); roofs.setColorAt(nr++, WC[Math.floor(r() * WC.length)].clone().multiplyScalar(0.85));
+  const r = rng(404);
+  OUTER_TREES.length = 0;
+  for (let i = 0, accepted = 0; i < 90000 && accepted < 12000; i++) {
+    const x = -2300 + r() * 4600, y = -2300 + r() * 4600;
+    if (rectDist(x, y) < 4 || Math.hypot(x, y) > 2300) continue;
+    const h = outerH(x, y), u = urban(x, y), chance = h > 10 ? 0.45 : (1 - (0.08 + 0.92 * u)) * 0.7 + 0.06;
+    if (r() > chance) continue;
+    const size = 7 + r() * 7, cx = Math.floor(x / cell), cy = Math.floor(y / cell);
+    let blocked = false;
+    for (let dx = -1; dx <= 1 && !blocked; dx++) for (let dy = -1; dy <= 1 && !blocked; dy++) {
+      for (const b of houseGrid.get((cx + dx) + ',' + (cy + dy)) || []) if (Math.hypot(x - b.x, y - b.y) < b.radius + size * 0.3) { blocked = true; break; }
     }
-  });
-  roofs.count = nr;
-  for (const im of [walls, roofs]) { im.receiveShadow = true; im.castShadow = false; scene.add(im); }
+    const species = r() < 0.45 ? 'mango' : r() < 0.6 ? 'rain' : 'jack';
+    if (blocked) continue;
+    accepted++;
+    if (hash2(x, y) < keepF) OUTER_TREES.push([x, y, h, species, size]);
+  }
+
+  // All boxes (walls, parapets, bands and windows) share eight angular instance batches.
+  // Only the low tin roofs need another geometry: at most sixteen draws for the entire city fabric.
+  const box = new THREE.BoxGeometry(1, 1, 1); box.translate(0, 0.5, 0);
+  const profile = new THREE.Shape(); profile.moveTo(-0.5, 0); profile.lineTo(0.5, 0); profile.lineTo(0, 1); profile.closePath();
+  const gable = new THREE.ExtrudeGeometry(profile, { depth: 1, bevelEnabled: false, steps: 1 }); gable.translate(0, 0, -0.5);
+  const material = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.9 });
+  const groups = [Array.from({ length: 8 }, () => []), Array.from({ length: 8 }, () => [])];
+  const dm = new THREE.Object3D(), colors = new Map();
+  const color = hex => { if (!colors.has(hex)) colors.set(hex, new THREE.Color(hex)); return colors.get(hex); };
+  const add = (b, kind, ox, elevation, oz, width, height, depth, hex) => {
+    const tr = outerPieceTransform(b, ox, elevation, oz, width, height, depth);
+    dm.position.fromArray(tr.position); dm.rotation.set(0, tr.angle, 0); dm.scale.fromArray(tr.scale); dm.updateMatrix();
+    const sector = Math.min(7, Math.floor((Math.atan2(b.y, b.x) + Math.PI) / (2 * Math.PI) * 8));
+    groups[kind][sector].push([dm.matrix.clone(), color(hex)]);
+  };
+  const walls = ['#d9d0bb', '#c3cfc5', '#d9c0ac', '#d6d4c9', '#cec49d'];
+  const tin = ['#8b5444', '#657b88', '#657b60', '#9b5747'];
+  for (const b of houses) {
+    const wc = walls[b.palette], rc = b.pitched ? tin[Math.floor(b.variation * tin.length)] : '#949188';
+    const detailed = b.detail && (q !== 'low' || b.rank < 0.15);
+    const height = b.floors * 3.1 + 0.45, baseFloors = b.stepped ? Math.ceil(b.floors * 0.6) : b.floors;
+    const baseHeight = b.stepped ? baseFloors * 3.1 : height;
+    add(b, 0, 0, -0.4, 0, b.width, baseHeight + 0.4, b.depth, wc);
+    add(b, 0, 0, baseHeight, 0, b.width + 0.45, 0.16, b.depth + 0.45, rc);
+    let topWidth = b.width, topDepth = b.depth, topX = 0, topZ = 0;
+    if (b.stepped) {
+      topWidth *= 0.72; topDepth *= 0.68; topX = -b.width * 0.10; topZ = b.depth * 0.08;
+      add(b, 0, topX, baseHeight, topZ, topWidth, height - baseHeight, topDepth, wc);
+      add(b, 0, topX, height, topZ, topWidth + 0.35, 0.16, topDepth + 0.35, rc);
+    }
+    if (b.pitched) {
+      add(b, 1, 0, height + 0.08, 0, b.width + 1.2, 1.7 + b.variation * 0.7, b.depth + 1.2, rc);
+    } else if (detailed) {
+      // Continuous low RCC parapets make roof terraces read as inhabited houses from the View point.
+      const parapet = (ox, oz, w, d, elevation) => {
+        for (const side of [-1, 1]) {
+          add(b, 0, ox, elevation, oz + side * d / 2, w + 0.25, 0.55, 0.18, wc);
+          add(b, 0, ox + side * w / 2, elevation, oz, 0.18, 0.55, d, wc);
+        }
+      };
+      parapet(topX, topZ, topWidth, topDepth, height + 0.16);
+      if (b.stepped) parapet(0, 0, b.width, b.depth, baseHeight + 0.16);
+      if (!b.stepped && b.floors > 1 && b.variation < 0.6) {
+        add(b, 0, b.width * 0.20, height + 0.16, b.depth * 0.18, 2.7, 2.2, 2.8, wc);
+        add(b, 0, b.width * 0.20, height + 2.36, b.depth * 0.18, 2.95, 0.14, 3.05, rc);
+      }
+    }
+    if (!detailed) continue;
+    for (let floor = 0; floor < b.floors; floor++) {
+      const upper = b.stepped && floor >= baseFloors;
+      const w = upper ? topWidth : b.width, d = upper ? topDepth : b.depth;
+      const ox = upper ? topX : 0, oz = upper ? topZ : 0, level = floor * 3.1;
+      if (floor > 0) add(b, 0, ox, level, oz, w + 0.12, 0.15, d + 0.12, '#e7e1d1');
+      // Two facades suffice at this distance; dark shallow boxes survive the haze without glass overdraw.
+      for (const side of [-1, 1]) {
+        for (let k = 0; k < 3; k++) add(b, 0, ox + (k - 1) * w * 0.26, level + 1.05, oz + side * (d / 2 + 0.035), 0.95, 1.15, 0.07, '#526365');
+        for (let k = 0; k < 2; k++) add(b, 0, ox + side * (w / 2 + 0.035), level + 1.05, oz + (k - 0.5) * d * 0.42, 0.07, 1.15, 0.85, '#596968');
+      }
+    }
+  }
+  groups.forEach((sectors, kind) => sectors.forEach((items, sector) => {
+    if (!items.length) return;
+    const mesh = new THREE.InstancedMesh(kind ? gable : box, material, items.length);
+    mesh.name = 'outer ' + (kind ? 'tin gables' : 'terraced houses') + ' sector ' + sector;
+    items.forEach(([matrix, tint], i) => { mesh.setMatrixAt(i, matrix); mesh.setColorAt(i, tint); });
+    mesh.receiveShadow = true; mesh.castShadow = false; mesh.computeBoundingSphere(); scene.add(mesh);
+  }));
 }
 
-export { fbm, rectDist, outerH, buildOuter, RX0, RX1, RY0, RY1, OUTER_TREES };
+export { fbm, rectDist, outerH, buildOuter, RX0, RX1, RY0, RY1, OUTER_TREES, outerPlanHash, outerFootprintRadius, outerPieceTransform, planOuterBuildings };

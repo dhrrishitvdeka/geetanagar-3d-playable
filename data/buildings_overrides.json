@@ -1,5 +1,5 @@
 {
-  "_readme": "Hand-checked facts per building, keyed by index in GEO.buildings. Fields (all optional): floors, wall (hex), shops (true/false), roof ('tin'|'flat'), roofCol (hex, tin roofs), style ('rcc'|'slide'|'assam'|'blank'), unfinished (bool), conf ('high'|'medium'|'low' = how sure the Street View match is), note. Panos: Google Street View, Mar 2026 imagery, viewed 2026-10-15; 'x -357 S' = looking south from the pano at local x = -357 on Mother Teresa Rd.",
+  "_readme": "Hand-checked facts per building, keyed by index in GEO.buildings. Fields (all optional): floors, wall (hex), trim (hex, slab/ledge paint), parapet (hex), shops (true/false), roof ('tin'|'flat'), roofCol (hex, tin roofs), style ('rcc'|'slide'|'assam'|'blank'), unfinished (bool), conf ('high'|'medium'|'low' = how sure the Street View match is), note. Panos: Google Street View, Mar 2026 imagery, viewed 2026-10-15; 'x -357 S' = looking south from the pano at local x = -357 on Mother Teresa Rd.",
   "_survey": {
     "x0": -505,
     "x1": 92,
@@ -9,6 +9,7 @@
   "832": {
     "floors": 3,
     "wall": "#c9a98c",
+    "trim": "#b98987",
     "shops": false,
     "conf": "medium",
     "note": "NW corner of Hatigarh Chariali: tan 3-storey house with pinkish slab edges, set back behind a big corner tree and the kiosk (pano 9Yn0U7qxM9dqWNLUej2-3g heading 330, Mar 2026)"
@@ -58,6 +59,7 @@
   "908": {
     "floors": 2,
     "wall": "#ebe8e2",
+    "trim": "#783d43",
     "shops": false,
     "conf": "medium",
     "note": "old 2-storey white house with a maroon band, behind brick wall and white gate pillars (x -418 S)"
@@ -72,6 +74,7 @@
   "900": {
     "floors": 5,
     "wall": "#e3d4a6",
+    "trim": "#794349",
     "shops": false,
     "conf": "high",
     "note": "cream/yellow 5-storey apartment with maroon floor bands and stilt parking (x -388 S, x -357 S)"
@@ -139,6 +142,7 @@
   "830": {
     "floors": 3,
     "wall": "#ebe8e1",
+    "trim": "#c47d42",
     "shops": false,
     "conf": "high",
     "note": "white house with orange trim used as a pre-school, set back behind a garden (x -266 N)"
@@ -160,6 +164,8 @@
   "926": {
     "floors": 3,
     "wall": "#eee3e0",
+    "trim": "#823e45",
+    "parapet": "#a85c51",
     "shops": false,
     "conf": "high",
     "note": "white 3-storey house with maroon bands and a red parapet (x -236 S, x -206 S)"
@@ -250,6 +256,7 @@
   "890": {
     "floors": 3,
     "wall": "#eceae5",
+    "trim": "#80444a",
     "shops": false,
     "conf": "high",
     "note": "white 3-storey house with maroon trim and a front stair (x 27 S, x 57 S)"

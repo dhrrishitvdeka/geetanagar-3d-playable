@@ -1,0 +1,10 @@
+{
+  "_about": "Facade appearance only, not verified business identities. Reconstructed from March 2026 Google Street View and the existing building survey. Sign text is generic where the original lettering cannot be read. Dimensions and shutter states remain estimates. No Google imagery is distributed as textures.",
+  "_source": "https://www.google.com/maps/@?api=1&map_action=pano&pano=9Yn0U7qxM9dqWNLUej2-3g&heading=215&pitch=0",
+  "905": { "board": "#283837", "ink": "#e4c85d", "label": "LOCAL SHOPS", "awning": "#697265", "shutter": "#78847d", "smallBoards": true, "confidence": "medium", "note": "Grey tower building at SW junction: weathered green-grey corrugated canopy, layered small boards. Checked live 2026-10-29; names unreadable." },
+  "916": { "board": "#a84935", "ink": "#f3e6be", "label": "LOCAL SHOPS", "awning": "#727f69", "shutter": "#858985", "smallBoards": true, "confidence": "medium", "note": "SE junction commercial frontage, dense mixed signboards; exact identities and dimensions unverified." },
+  "909": { "board": "#e9e6d6", "ink": "#315b46", "label": "SHOPS", "awning": "#566f63", "shutter": "#7d9190", "smallBoards": false, "confidence": "medium", "note": "Existing survey: pharmacy and shops under yellow apartment. Lettering and exact bay use not verified." },
+  "879": { "board": "#245c9a", "ink": "#f2efe0", "label": "LOCAL SHOPS", "awning": "#3976a1", "shutter": "#758a9a", "smallBoards": false, "confidence": "high", "note": "Existing survey x27 south: single-storey shop row with blue flex banners; business names unreadable." },
+  "889": { "board": "#f0e4c7", "ink": "#8d3939", "label": "LOCAL SHOPS", "awning": "#796b60", "shutter": "#929489", "smallBoards": true, "confidence": "medium", "note": "Existing survey: pink coaching building with ground-floor shops. Do not infer coaching business identity." },
+  "887": { "board": "#2c5e93", "ink": "#f0f0e6", "label": "LOCAL SHOPS", "awning": "#3e6e99", "shutter": "#82929a", "smallBoards": false, "confidence": "medium", "note": "Existing survey x57-88 south: blue-white five-storey building with ground-floor shops. Board design estimated." }
+}

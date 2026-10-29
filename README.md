@@ -2,11 +2,11 @@
 
 A walk-around 3D game set in Geetanagar, a neighbourhood of Guwahati, Assam. Walk Mother Teresa Rd from Hatigarh Chariali to the
 mandir, drink lal sah at Bina Baideu's stall, kick a ball about with the kids on the field, and dance the Rongali Bihu in the
-evening. Built with three.js and Vite; everything you see (buildings, people, vehicles, sounds) is made in code or from free CC0 assets.
+evening. Built with three.js and Vite using procedural geometry, synthesised sound, and attributed external assets. See [CREDITS.md](CREDITS.md) for recorded sources and outstanding provenance checks.
 
 ## Run it
 
-You need [Node.js](https://nodejs.org) 20 or newer.
+You need [Node.js](https://nodejs.org) 20.19+ or 22.12+ (Node 24 LTS is also supported).
 
 On Windows, double-click `run.bat`: it installs dependencies on the first run and opens the game in its own browser window on the
 laptop's dedicated GPU. Or by hand:
@@ -15,6 +15,7 @@ laptop's dedicated GPU. Or by hand:
 npm install
 npm run dev        # then open http://localhost:5173/game.html
 npm run build      # static build in dist/
+npm test           # gameplay, collision and development-server regression checks
 ```
 
 Add `?autostart` to the address to skip the title menu, or `?fps` for a frame-rate readout that names the GPU in use.
@@ -79,7 +80,16 @@ On a touch screen the joystick moves and dragging the view looks around.
 
 Coordinates are local metres (x east, y north); three.js is y-up, so a map point `(x, y)` at height `h` is `Vector3(x, h, -y)`.
 
+World accuracy and the street references used for the latest detail pass are recorded in [WORLD_ACCURACY.md](WORLD_ACCURACY.md). Street-level geometry is a reconstruction, with surveyed features separated from procedural detail. Unreadable shop signs are not treated as verified business identities.
+
+Developer screenshot saving is disabled by default. To use the local `/__shot` capture endpoint, set `GEET_SCREENSHOTS=1` before starting the development server. It accepts bounded PNG data URLs from the same origin only.
+
 ## Credits
 
 Libraries and assets, with their licences, are listed in [CREDITS.md](CREDITS.md). Map footprints were traced for this project
 from map imagery; road names are © OpenStreetMap contributors (ODbL); terrain is from the Copernicus GLO-30 DEM.
+
+## Licence
+
+The source code is under the [MIT License](LICENSE). It does not cover `data/` or `public/assets/`: each of those keeps the
+licence and terms listed for it in [CREDITS.md](CREDITS.md).

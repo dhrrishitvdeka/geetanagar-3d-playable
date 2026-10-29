@@ -4,7 +4,7 @@ import { MAINP, NRM, asphHalf, hw, nearestOnMain } from '../../world/mainroad.js
 import { beside } from '../../world/streetlife.js';
 import { findOpen } from '../../ui/controls.js';
 import { spawnNPC } from '../npc/agents.js';
-import { isUIBlocking, showDialogue } from '../hud.js';
+import { showDialogue } from '../hud.js';
 import { openShop } from '../items.js';
 import { discountFor, noteTalk } from '../friends.js';
 
@@ -115,11 +115,11 @@ const NAMED = [
 const BY_ID = Object.fromEntries(NAMED.map(d => [d.id, d]));
 
 // ---------- talking helpers (quests.js uses these too) ----------
-// A dialogue the HUD force-closed (pause, day change) resolves null while a modal is still up: that throws Aborted, which the
-// talk wrappers swallow, so a conversation just ends and state is only ever changed after the player's final choice.
+// A forced close or Escape resolves null; an acknowledged line resolves true. Cancellation must not depend on whether
+// another menu happens to be open (the day-change fade has none).
 class Aborted extends Error {}
-async function say(npc, text) { await showDialogue({ speaker: npc.name, role: npc.title, text }); if (isUIBlocking()) throw new Aborted(); }
-async function ask(npc, text, choices) { const v = await showDialogue({ speaker: npc.name, role: npc.title, text, choices }); if (v == null && isUIBlocking()) throw new Aborted(); return v; }
+async function say(npc, text) { const v = await showDialogue({ speaker: npc.name, role: npc.title, text }); if (v == null) throw new Aborted(); }
+async function ask(npc, text, choices) { const v = await showDialogue({ speaker: npc.name, role: npc.title, text, choices }); if (v == null) throw new Aborted(); return v; }
 async function sayAll(npc, lines) { for (const t of lines) await say(npc, t); }
 const turn = new Map();
 async function chat(npc) { // rotates through the person's small talk

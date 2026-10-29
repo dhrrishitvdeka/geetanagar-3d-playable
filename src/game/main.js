@@ -18,6 +18,9 @@ import { buildOuter } from '../world/outer.js';
 import { buildKiosks } from '../world/shops.js';
 import { buildHatigarh, buildPoles, buildTraffic } from '../world/streetlife.js';
 import { buildStreets } from '../world/streets.js';
+import { buildStreetscape } from '../world/streetscape.js';
+import { buildLaneDetails } from '../world/lanedetails.js';
+import { buildResidentialDetails } from '../world/residential.js';
 import { setFieldGateOpen } from '../world/road/fieldedge.js';
 import { buildCompoundWalls } from '../world/compound.js';
 import { buildDetails } from '../world/details.js';
@@ -64,7 +67,8 @@ let spawn = { x: 0, y: 0, heading: Math.PI / 2 };
   await new Promise(r => setTimeout(r, 30));
   safe('paintGround', paintGround); safe('applyGroundTextures', applyGroundTextures); safe('buildAll', buildAll);
   setFieldGateOpen(true, -26); // open the field gate where the road frontage is clear
-  safe('buildStreets', buildStreets); safe('buildCompoundWalls', buildCompoundWalls); safe('buildDetails', buildDetails);
+  safe('buildStreets', buildStreets); safe('buildStreetscape', buildStreetscape); safe('buildCompoundWalls', buildCompoundWalls); safe('buildDetails', buildDetails);
+  safe('buildLaneDetails', buildLaneDetails); safe('buildResidentialDetails', buildResidentialDetails);
   safe('buildMandir', buildMandir); safe('buildKiosks', buildKiosks); safe('buildDeck', buildDeck); safe('buildHatigarh', buildHatigarh);
   safe('buildTraffic', () => buildTraffic({ lanes: false })); safe('buildPoles', buildPoles); safe('buildOuter', buildOuter); // moving traffic replaces the frozen lane vehicles
   const palms = safe('collectTrees', collectTrees) || [];

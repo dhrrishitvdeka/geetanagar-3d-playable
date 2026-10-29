@@ -6,6 +6,7 @@ import { footRaise } from '../world/road/footpath.js';
 import { blockedBySeg } from '../world/geom.js';
 import { on, emit } from './core/bus.js';
 import { state } from './core/state.js';
+import { movePlanar } from './core/movement.js';
 import { axis, isDown, pressed, wheel } from './input.js';
 import { makeCharacter, randomAppearance } from './npc/humanoid.js';
 import { npcBlocking } from './npc/agents.js';
@@ -165,11 +166,9 @@ function updateWalking(dt, ax, free, binoc) {
 
   const ox = P.x, oy = P.y, dx = (P.vx + kx) * dt, dy = (P.vy + ky) * dt;
   if (Math.abs(dx) + Math.abs(dy) > 1e-6) {
-    const h0 = groundAt(ox, oy);
-    if (canStand(ox + dx, oy + dy, ox, oy, h0)) { P.x = ox + dx; P.y = oy + dy; }
-    else if (canStand(ox + dx, oy, ox, oy, h0)) { P.x = ox + dx; P.vy = 0; }  // slide along the wall
-    else if (canStand(ox, oy + dy, ox, oy, h0)) { P.y = oy + dy; P.vx = 0; }
-    else { P.vx = P.vy = 0; }
+    const hit = movePlanar(P, dx, dy, (nx, ny, px, py) => canStand(nx, ny, px, py, groundAt(px, py)));
+    if (hit.blockedX) P.vx = 0;
+    if (hit.blockedY) P.vy = 0;
   }
   const md = Math.hypot(P.x - ox, P.y - oy);
   P.speed += (md / Math.max(dt, 1e-4) - P.speed) * (1 - Math.exp(-12 * dt));
@@ -249,10 +248,12 @@ function updateRiding(dt, ax) {
   const lead = clamp(Math.abs(vs) / 3, 0, 1) * (1 - 0.55 * clamp(Math.abs(vs) / max, 0, 1)); // turns tighter when slow
   v.heading += -steer * 2.1 * lead * dt * (vs >= 0 ? 1 : -1);
 
-  const ox = v.x, oy = v.y, h = v.heading, nx = ox + Math.cos(h) * vs * dt, ny = oy + Math.sin(h) * vs * dt;
+  const ox = v.x, oy = v.y, h = v.heading;
   if (Math.abs(vs) > 1e-3) {
-    if (canRide(nx, ny, ox, oy, groundAt(ox, oy), v, vs >= 0 ? 1 : -1)) { v.x = nx; v.y = ny; }
-    else { vs *= -0.25; if (Math.abs(vs) < 0.4) vs = 0; }
+    const sign = vs >= 0 ? 1 : -1;
+    const hit = movePlanar(v, Math.cos(h) * vs * dt, Math.sin(h) * vs * dt,
+      (nx, ny, px, py) => canRide(nx, ny, px, py, groundAt(px, py), v, sign), { slide: false });
+    if (hit.blocked) { vs *= -0.25; if (Math.abs(vs) < 0.4) vs = 0; }
   }
   const md = Math.hypot(v.x - ox, v.y - oy);
   state.stats.distance += md;

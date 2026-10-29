@@ -7,6 +7,7 @@ import { M, std } from './materials.js';
 import { FIELD_X0 } from './road/fieldedge.js';
 import { busShelter, cabinet, gantry, handcart, highMast, kiosk, roofTower, signalPole, stall, trafficIsland, umbrellaStall } from './road/props.js';
 import { BLD } from './buildings.js';
+import { buildTeaShelter } from './forecourt.js';
 import { CAR_COLS, TOTO_COLS, TWO_COLS, addVehicle } from './road/vehicles.js';
 
 // ================= street life: Hatigarh Chariali, parked and moving vehicles, electric poles and wires =================
@@ -31,7 +32,7 @@ function buildHatigarh() {
   // park forecourt (south side, x -170..-66): tea stall, blue kiosks, parked cars, big trees; and the bus stand
   const rf = rng(91), fore = (x, extra) => { const [, i] = nearestOnMain(x, MAINP.find(p => p[0] >= x)[1]); const [px, py] = beside(x, -1, asphHalf(i) + extra); return [px, py, heading(i) + Math.PI / 2]; };
   for (const st of RF.stalls) {
-    if (st.kind === 'tea_stall') { const [px, py, a] = fore(st.x, 3.6); stall(px, py, a, '#6d4a2c', 77); }
+    if (st.kind === 'tea_stall') { const [px, py, a] = fore(st.x, 3.6); buildTeaShelter(px, py, a); }
     else if (st.kind === 'kiosk_blue') { const [px, py, a] = fore(st.x, 3.4); kiosk(px, py, a, '#2f62b0', '#3f74c0'); }
   }
   for (const c of RF.parked || []) { const [px, py, a] = fore(c.x, 3.2); addVehicle(rf() < 0.5 ? 'hatch' : 'sedan', px, py, a - Math.PI / 2 + (rf() - 0.5) * 0.3, CAR_COLS[Math.floor(rf() * CAR_COLS.length)], 0.04); }

@@ -7,6 +7,7 @@ import { deckBlocked, groundAt } from '../world/deck.js';
 import { footRaise } from '../world/road/footpath.js';
 import { blockedBySeg } from '../world/geom.js';
 import { hatigarh } from '../world/mainroad.js';
+import { movePlanar } from '../game/core/movement.js';
 
 // ---------- camera modes ----------
 const orbit = new OrbitControls(camera, canvas);
@@ -19,6 +20,9 @@ const SPOTS = {
   mandir: { x: 49.5, y: -44.5, yaw: 0.05, pitch: 0.12 },
   field: { x: (GEO.field[0] + GEO.field[2]) / 2, y: GEO.field[1] + 7, yaw: 0.15 },
   fss: { x: GEO.fss[0] - 8, y: GEO.fss[1] - 25, yaw: 0.2 },
+  railway: { x: -500.8, y: 68.7, yaw: 0 }, // sampled Railway Colony Road centreline
+  karbi: { x: -606.8, y: 117.6, yaw: -Math.PI / 2 }, // sampled Karbi Path centreline
+  talukdar: { x: -642.2, y: 242.2, yaw: -0.6 }, // sampled Talukdar Road centreline
   hatigarh: (() => { const l = GEO.labels.find(l => l.t === 'Hatigarh Chariali'); return { x: l.x + 18, y: l.y + 2, yaw: Math.PI / 2 }; })(),
   park: { x: -118.6, y: -73.5, yaw: Math.PI + 0.35, pitch: -0.02 }, // forecourt by the road, looking SSE at the gate and sheds (as Street View pano kEM0kEBZ4oUXOCakZBgK1g)
   sbi: (() => { const l = GEO.labels.find(l => l.t === 'SBI Branch Gitanagar'); return { x: l.x - 14, y: l.y + 8, yaw: -Math.PI / 2 }; })(),
@@ -111,10 +115,8 @@ function stepWalk(dt) {
   const rx = Math.cos(player.yaw), ry = Math.sin(player.yaw);
   const dx = (fx * f + rx * s) * speed * dt, dy = (fy * f + ry * s) * speed * dt;
   // move with wall sliding; steep ground also slows you down
-  const h0 = groundAt(player.x, player.y);
-  const tryMove = (nx, ny) => { if (!walkable(nx, ny) || deckBlocked(nx, ny, h0)) return false; const dr = footRaise(nx, ny) - footRaise(player.x, player.y), dh = groundAt(nx, ny) - h0 - dr, dist = Math.hypot(nx - player.x, ny - player.y) || 1; return dr <= 0.45 && dh / dist < 1.2; }; // a kerb up to 0.45 m is a step; the slope test ignores it
-  if (tryMove(player.x + dx, player.y + dy)) { player.x += dx; player.y += dy; }
-  else { if (tryMove(player.x + dx, player.y)) player.x += dx; else if (tryMove(player.x, player.y + dy)) player.y += dy; }
+  const tryMove = (nx, ny, ox, oy) => { const h0 = groundAt(ox, oy); if (!walkable(nx, ny) || deckBlocked(nx, ny, h0)) return false; const dr = footRaise(nx, ny) - footRaise(ox, oy), dh = groundAt(nx, ny) - h0 - dr, dist = Math.hypot(nx - ox, ny - oy) || 1; return dr <= 0.45 && dh / dist < 1.2; }; // a kerb up to 0.45 m is a step; the slope test ignores it
+  movePlanar(player, dx, dy, tryMove);
   const moving = m > 0.05;
   bob = moving ? bob + dt * speed * 2.2 : bob * 0.9;
   const gy = groundAt(player.x, player.y) + player.eye + Math.sin(bob) * (moving ? 0.035 : 0);

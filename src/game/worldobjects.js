@@ -436,7 +436,7 @@ function ballTex() {
   }, false);
 }
 function placeBall(x, y) {
-  ball.x = x; ball.y = y; ball.vx = ball.vy = ball.vz = 0; ball.z = groundAt(x, y) + ball.r; syncBall();
+  ball.x = x; ball.y = y; ball.vx = ball.vy = ball.vz = 0; ball.lastPlayer = ball.lastKid = -99; ball.z = groundAt(x, y) + ball.r; syncBall();
 }
 function syncBall() { ball.mesh.position.set(ball.x, ball.z, -ball.y); ball.pos[0] = ball.x; ball.pos[1] = ball.y; ball.pos[2] = ball.z; }
 function buildBall() {
@@ -525,7 +525,7 @@ const ballRef = () => (ball.mesh ? ball : null); // the live ball for per-frame 
 // an NPC strikes the ball: map angle, ground speed, upward speed. Refused while it is held, in the goal reset or just kicked
 function npcKick(ang, v, lift) {
   if (!ball.mesh || ball.carried || ball.resetT > 0 || T - ball.lastKid < 0.3) return false;
-  ball.vx = Math.cos(ang) * v; ball.vy = Math.sin(ang) * v; ball.vz = lift; ball.lastKid = T;
+  ball.vx = Math.cos(ang) * v; ball.vy = Math.sin(ang) * v; ball.vz = lift; ball.lastKid = T; ball.lastPlayer = -99;
   if (v > 2.5) sfx('kick', { x: ball.x, y: ball.y, vol: Math.min(1, v / 9) }); return true;
 }
 // a body at (x, y) with radius r shoves a rolling ball out of itself (feet, shins), so nobody runs through it

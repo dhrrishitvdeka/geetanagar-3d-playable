@@ -7,6 +7,7 @@ import { footRaise } from './road/footpath.js';
 import { MAT, box, canvasTex, std } from './materials.js';
 import { facadeMaterials } from './bldg/facades.js';
 import { MeshBuilder } from './bldg/mesh.js';
+import STOREFRONTS from '../../data/storefront_profiles.json';
 
 // ---------- roadside kiosks: behind the footpath railing, not on it ----------
 function kioskTex(name, bg, fg) {
@@ -197,7 +198,26 @@ function buildShopfronts(list) {
   const WHITE = new THREE.Color(1, 1, 1), GREY = new THREE.Color('#6f7375'), STEP = new THREE.Color('#a9a59c'), FRAME = new THREE.Color('#3c3f42');
   const tarp = ['#2f6fb3', '#2f6fb3', '#3f7fbf', '#2e7d32', '#c62828', '#d9a520', '#00838f', '#8b8f93'].map(c => new THREE.Color(c));
   let si = 0;
+  const surveyedSigns = new Map();
+  const surveyedSign = (id, profile) => {
+    if (!surveyedSigns.has(id)) {
+      const tex = canvasTex(1024, 192, (g, w, h) => {
+        g.fillStyle = profile.board; g.fillRect(0, 0, w, h);
+        g.fillStyle = profile.ink; g.textAlign = 'center'; g.textBaseline = 'middle';
+        g.font = 'bold 68px Arial, sans-serif'; g.fillText(profile.label, w / 2, 78);
+        g.font = '24px Arial, sans-serif'; g.fillText('MOTHER TERESA ROAD', w / 2, 139);
+        const r = rng(Number(id));
+        for (let k = 0; k < 100; k++) { g.fillStyle = `rgba(48,42,32,${r() * 0.14})`; g.fillRect(r() * w, r() * h, 1 + r() * 4, 4 + r() * 55); }
+        g.strokeStyle = 'rgba(25,30,28,0.5)'; g.lineWidth = 6; g.strokeRect(3, 3, w - 6, h - 6);
+      }, false);
+      surveyedSigns.set(id, { mesh: new MeshBuilder(), material: new THREE.MeshStandardMaterial({ map: tex, roughness: 0.83, side: THREE.DoubleSide }) });
+    }
+    return surveyedSigns.get(id).mesh;
+  };
   for (const b of list) {
+    const profile = b.sign != null ? null : STOREFRONTS[b.buildingId] || b.profile;
+    // Keep the atlas's corrugation/weathering visible while nudging it toward the surveyed paint.
+    const shutterTint = profile?.shutter ? C(profile.shutter).clone().lerp(WHITE, 0.55) : WHITE;
     const pts = b.pts, top = b.top;
     for (const ei of b.edges) {
       const a = pts[ei], c = pts[(ei + 1) % pts.length], L = Math.hypot(c[0] - a[0], c[1] - a[1]);
@@ -224,17 +244,17 @@ function buildShopfronts(list) {
           if (hasCounter) addCollider([P(al0 + 0.2, 0.74, 0)[0], P(al0 + 0.2, 0.74, 0)[1]], [P(al1 - 0.2, 0.74, 0)[0], P(al1 - 0.2, 0.74, 0)[1]]);
           if (!keeperBay) {
             keeperBay = true; const k = P(mid, hasCounter ? 0.22 : 0.3, 0), f = P(mid, 1.35, 0);
-            SHOP_BAYS.push({ row, name: SHOP_NAMES[row], tag: TAGS[row], kind, sells: SELLS[row] || null, x: k[0], y: k[1], z: top + 0.02, heading: Math.atan2(n[1], n[0]), fx: f[0], fy: f[1] });
+            SHOP_BAYS.push({ row, name: profile ? 'Local shop' : SHOP_NAMES[row], tag: TAGS[row], kind, sells: SELLS[row] || null, x: k[0], y: k[1], z: top + 0.02, heading: Math.atan2(n[1], n[0]), fx: f[0], fy: f[1] });
           }
         }
         if (state !== 'closed') inter.quad(P(al0, 0.03, top), P(al1, 0.03, top), P(al1, 0.03, top + H), P(al0, 0.03, top + H), [n[0], n[1], 0], WHITE, [[iu0, 0.5], [iu1, 0.5], [iu1, 1], [iu0, 1]]);
         const f = state === 'open' ? 0.06 : state === 'half' ? 0.35 + (hsh - 0.5) * 1.2 : 1, zb = top + H * (1 - f);
-        shut.quad(P(al0, 0.07, zb), P(al1, 0.07, zb), P(al1, 0.07, top + H), P(al0, 0.07, top + H), [n[0], n[1], 0], WHITE, [[su0, 0.5 - f * 0.5], [su1, 0.5 - f * 0.5], [su1, 0.5], [su0, 0.5]]);
+        shut.quad(P(al0, 0.07, zb), P(al1, 0.07, zb), P(al1, 0.07, top + H), P(al0, 0.07, top + H), [n[0], n[1], 0], shutterTint, [[su0, 0.5 - f * 0.5], [su1, 0.5 - f * 0.5], [su1, 0.5], [su0, 0.5]]);
         trim.box(a, u, n, al0, al1, 0.04, 0.1, zb - 0.05, zb + 0.02, FRAME, 'ftu', top);                                // shutter bottom bar
         trim.box(a, u, n, al0 - 0.05, al1 + 0.05, 0, 0.32, top + H, top + 2.98, GREY, 'ftu', top);                      // shutter roll housing
         // awning over most bays: sloping tarp with a front valance and two thin struts
         if (hash2(k * 1.9, a[0] + a[1]) < 0.72) {
-          const col = tarp[Math.floor(hash2(a[0] + k, 3) * tarp.length)].clone().multiplyScalar(0.85 + hash2(k, a[1]) * 0.2), striped = hash2(a[1] + k, 7) < 0.25;
+          const col = (profile ? C(profile.awning).clone() : tarp[Math.floor(hash2(a[0] + k, 3) * tarp.length)].clone()).multiplyScalar(0.85 + hash2(k, a[1]) * 0.2), striped = !profile && hash2(a[1] + k, 7) < 0.25;
           const o = 1.25 + hash2(k, 5) * 0.4, zt = top + 2.95, zf = top + 2.4, s0 = striped ? 0.5 : 0, s1 = Math.min(s0 + 0.5, s0 + (al1 - al0 + 0.3) / 8);
           awn.quad(P(al0 - 0.15, 0.3, zt), P(al1 + 0.15, 0.3, zt), P(al1 + 0.15, o, zf), P(al0 - 0.15, o, zf), [n[0] * 0.4, n[1] * 0.4, 0.9], col, [[s0, 1], [s1, 1], [s1, 0.3], [s0, 0.3]]);
           awn.quad(P(al0 - 0.15, o, zf), P(al1 + 0.15, o, zf), P(al1 + 0.15, o, zf - 0.28), P(al0 - 0.15, o, zf - 0.28), [n[0], n[1], 0], col.clone().multiplyScalar(0.9), [[s0, 0.3], [s1, 0.3], [s1, 0], [s0, 0]]);
@@ -244,16 +264,28 @@ function buildShopfronts(list) {
       // signboard: one flex board across the frontage, in a thin steel frame
       const u0 = (row % 2) * 0.5, u1 = u0 + 0.5, v1 = 1 - Math.floor(row / 2) / 16, v0 = v1 - 1 / 16;
       const sh = Math.min(1.15, 0.85 + L * 0.02), z0 = top + 3.0, z1 = z0 + sh;
-      sign.quad(P(0.1, 0.2, z0), P(L - 0.1, 0.2, z0), P(L - 0.1, 0.2, z1), P(0.1, 0.2, z1), [n[0], n[1], 0], WHITE, [[u0, v0], [u1, v0], [u1, v1], [u0, v1]]);
+      const board = profile ? surveyedSign(b.buildingId, profile) : sign;
+      board.quad(P(0.1, 0.2, z0), P(L - 0.1, 0.2, z0), P(L - 0.1, 0.2, z1), P(0.1, 0.2, z1), [n[0], n[1], 0], WHITE, profile ? [[0, 0], [1, 0], [1, 1], [0, 1]] : [[u0, v0], [u1, v0], [u1, v1], [u0, v1]]);
       trim.box(a, u, n, 0.06, L - 0.06, 0.1, 0.19, z0 - 0.04, z1 + 0.04, FRAME, 'tulr', top);
+      // Surveyed junction buildings carry layered projecting boards, shutter guides and canopy supports.
+      for (let k = 0; k < bays; k++) {
+        const al = k * bw + 0.2;
+        trim.box(a, u, n, al, al + 0.045, 0.1, 0.14, top + 0.03, top + H, FRAME, 'ftlr', top);
+        if (profile && profile.smallBoards && k % 2 === 0) {
+          const x0 = al + 0.1, x1 = Math.min(L - 0.1, al + Math.min(1.05, bw * 0.65));
+          trim.box(a, u, n, x0, x1, 0.23, 0.3, top + 4.3, top + 4.78, C(profile.board), 'fbtulr', top);
+          for (let j = 0; j < 3; j++) trim.box(a, u, n, x0 + 0.07, x1 - 0.07, 0.301, 0.308, top + 4.38 + j * 0.1, top + 4.4 + j * 0.1, C(profile.ink), 'f', top);
+        }
+      }
     }
   }
   inter.mesh(new THREE.MeshStandardMaterial({ map: shopAtlas, emissive: '#ffffff', emissiveMap: shopAtlas, emissiveIntensity: 0.22, roughness: 0.8, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }), { cast: false });
-  shut.mesh(new THREE.MeshStandardMaterial({ map: shopAtlas, roughness: 0.5, metalness: 0.45, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 }), { cast: false });
+  shut.mesh(new THREE.MeshStandardMaterial({ map: shopAtlas, vertexColors: true, roughness: 0.5, metalness: 0.45, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 }), { cast: false });
   sign.mesh(new THREE.MeshStandardMaterial({ map: signAtlas, roughness: 0.55, emissive: '#ffffff', emissiveMap: signAtlas, emissiveIntensity: 0.12, side: THREE.DoubleSide }));
   awn.mesh(new THREE.MeshStandardMaterial({ map: awningTex, vertexColors: true, side: THREE.DoubleSide, roughness: 0.85 }));
   trim.mesh(FM.trim);
   goods.mesh(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.75 }));
+  for (const { mesh, material } of surveyedSigns.values()) mesh.mesh(material);
 }
 
 export { kioskTex, kiosk, buildKiosks, buildShopfronts, GOODS, SHOP_NAMES, SIGN_COLS, signAtlas, shopAtlas, SHOP_BAYS };

@@ -6,7 +6,7 @@ import { QUALITY, saveQuality } from '../render/quality.js';
 import { emit, on } from './core/bus.js';
 import * as input from './input.js'; // namespace import: resetPresses only exists once the engine adds it
 import { clockText, hasSave, save, saveSettings, state } from './core/state.js';
-import { getPlayer } from './player.js';
+import { getPlayer, getSafePos } from './player.js';
 import { getQuestLog } from './quests.js';
 import { ITEMS, isWorn, useItem } from './items.js';
 import { isFullMapOpen } from './map.js';
@@ -459,7 +459,7 @@ function advance() { // click, or an advance key, on the dialogue
   const d = dlg; if (!d) return;
   if (d.typing) { completeText(); return; }
   if (d.choices.length) { if (d.sel >= 0) pickChoice(d.sel); return; }
-  endDialogue(null);
+  endDialogue(true); // acknowledged; null is reserved for cancellation
 }
 function pickChoice(i) {
   const d = dlg; if (!d || d.typing || !d.choices[i] || d.choices[i].disabled) return;
@@ -617,7 +617,7 @@ function head(card, title, sub, back) {
 }
 function savePlayerNow() {
   if (!started) return false;
-  try { const p = getPlayer(); state.player = { x: p.x, y: p.y, heading: p.heading }; } catch (e) { /* no player yet */ }
+  try { const p = getSafePos(); state.player = { x: p.x, y: p.y, heading: p.heading }; } catch (e) { /* no player yet */ }
   return save();
 }
 function resumeGame() {

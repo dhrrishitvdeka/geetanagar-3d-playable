@@ -184,7 +184,7 @@ on('bus:stopped', ({ x, y }) => {
   for (const r of PEOPLE) {
     if (!r.legs) continue; const n = r.n;
     if (n && !n.talking && Math.hypot(n.x - x, n.y - y) < 25) {
-      const k = r.legs.findIndex(L => L.mode === 'board'); if (k < 0 || t < r.legs[k].at) continue;
+      const k = r.legs.findIndex(L => L.mode === 'board'); if (k < 0 || r.leg !== k || t < r.legs[k].at) continue;
       r.leg = k; npcMoveTo(r.id, x + (n.x - x) * 0.25, y + (n.y - y) * 0.25, { onArrive: () => drop(r) }); // up the steps
     } else if (!n && r.waitBus && t < r.waitBus) {
       const k = r.legs.findIndex(L => L.fromBus); r.waitBus = 0;

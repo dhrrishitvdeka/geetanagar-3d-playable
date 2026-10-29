@@ -82,7 +82,7 @@ function hit(o, bx, by, sp) {
   if (sp < 0.3) return; // standing still against it only nudges it out of the way
   const want = sp * o.k.push + 0.4, along = o.vx * nx + o.vy * ny;
   if (along < want) { o.vx += nx * (want - along); o.vy += ny * (want - along); }
-  if (!o.down) { o.down = true; o.ax = Math.atan2(ny, nx) + Math.PI / 2; o.z = groundAt(o.x, o.y) + o.k.r; } // falls away from the hit, axis across it
+  if (o.kind !== 'ball' && !o.down) { o.down = true; o.ax = Math.atan2(ny, nx) + Math.PI / 2; o.z = groundAt(o.x, o.y) + o.k.r; } // falls away from the hit, axis across it
   if (sp > 1.2) o.vz = Math.min(2.5, sp * 0.35);
   if (o.hitCd <= 0) { sfx(o.k.sound, { x: o.x, y: o.y, pitch: o.k.pitch, vol: o.k.vol * Math.min(1, sp / 3) }); o.hitCd = 0.25; }
 }
@@ -91,7 +91,7 @@ function step(o, dt) {
   const k = o.k, rest = o.kind === 'ball' || o.down ? k.r : 0;
   let sp = Math.hypot(o.vx, o.vy); const gz0 = groundAt(o.x, o.y) + rest;
   if (sp < 0.02 && o.vz === 0 && o.z <= gz0 + 0.005) { if (o.vx || o.vy) { o.vx = o.vy = 0; } if (Math.abs(o.z - gz0) > 1e-3) { o.z = gz0; o.dirty = true; } return; }
-  if (o.down) { // a lying cylinder rolls across its axis; any slide along the axis dies fast
+  if (o.kind !== 'ball' && o.down) { // a lying cylinder rolls across its axis; any slide along the axis dies fast
     const cx = Math.cos(o.ax), cy = Math.sin(o.ax), along = o.vx * cx + o.vy * cy, decay = Math.exp(-8 * dt);
     o.vx -= cx * along * (1 - decay); o.vy -= cy * along * (1 - decay);
   }

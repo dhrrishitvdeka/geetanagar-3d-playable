@@ -3,6 +3,8 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { scene } from '../core/context.js';
 import { hAt } from '../core/geo.js';
 import { M } from './materials.js';
+export { addCollider, blockedBySeg, COLL, CC } from './colliders.js';
+import { addCollider } from './colliders.js';
 
 // ---- geometry helpers ----
 function resample(pts, step = 2) {
@@ -47,21 +49,6 @@ function disc(x, y, r, yOff) {
   g.computeVertexNormals(); return g;
 }
 
-// ---- colliders: railings, fences and walls you can't walk through ----
-const COLL = new Map(), CC = 10;
-function addCollider(a, b) {
-  const x0 = Math.floor(Math.min(a[0], b[0]) / CC), x1 = Math.floor(Math.max(a[0], b[0]) / CC), y0 = Math.floor(Math.min(a[1], b[1]) / CC), y1 = Math.floor(Math.max(a[1], b[1]) / CC);
-  for (let i = x0; i <= x1; i++) for (let j = y0; j <= y1; j++) { const k = i + ',' + j; (COLL.get(k) || COLL.set(k, []).get(k)).push([a, b]); }
-}
-function blockedBySeg(x, y, r = 0.3) {
-  const l = COLL.get(Math.floor(x / CC) + ',' + Math.floor(y / CC)); if (!l) return false;
-  for (const [a, b] of l) {
-    const dx = b[0] - a[0], dy = b[1] - a[1], L2 = dx * dx + dy * dy || 1; let t = ((x - a[0]) * dx + (y - a[1]) * dy) / L2; t = Math.max(0, Math.min(1, t));
-    if (Math.hypot(x - a[0] - dx * t, y - a[1] - dy * t) < r) return true;
-  }
-  return false;
-}
-
 // ---- railings along a polyline, skipping gaps ----
 const railBits = { post: [], rail: [] };
 // infill: material key for an alpha-tested vertical-bar panel (one cheap strip instead of thousands of balusters)
@@ -102,4 +89,4 @@ function polyMesh(poly, mat, yOff, uvScale) {
   const m = new THREE.Mesh(g, mat); m.receiveShadow = true; scene.add(m); return m;
 }
 
-export { resample, normalsOf, strip, mergeAdd, disc, addCollider, blockedBySeg, railing, flushRailings, polyMesh, COLL, CC, railBits };
+export { resample, normalsOf, strip, mergeAdd, disc, railing, flushRailings, polyMesh, railBits };

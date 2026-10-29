@@ -60,7 +60,7 @@ function massing(b, bi) {
   const style = ov.style || (isTin ? 'assam' : lst ? { school: 'rcc', bank: 'slide', temple: 'blank' }[lst.kind] || 'rcc' : s3 < 0.55 ? 'rcc' : 'slide');
   const wallCol = C(ov.wall ? ov.wall : lst ? LCOL[lst.kind] : isTin ? ASSAM_WALLS[Math.floor(s * 997) % ASSAM_WALLS.length] : b.k ? SHOP_WALLS[Math.floor(s2 * SHOP_WALLS.length)] : WALLS[Math.floor(s * 997) % WALLS.length]);
   const tv = hash2(s2 * 9, s * 7); // trim: same paint, off-white bands, or a darker shade
-  const trimCol = tv < 0.5 ? wallCol.clone().multiplyScalar(0.93) : tv < 0.75 ? C('#e8e4da') : wallCol.clone().multiplyScalar(0.76);
+  const trimCol = ov.trim ? C(ov.trim) : tv < 0.5 ? wallCol.clone().multiplyScalar(0.93) : tv < 0.75 ? C('#e8e4da') : wallCol.clone().multiplyScalar(0.76);
   const unfinished = ov.unfinished != null ? ov.unfinished : !isTin && !lst && floors >= 2 && vw === null && s3 > 0.965 && b.d > 40;
   return { ov, raw, base, top, s, s2, s3, floors, a, lst, lowSight, vw, z0, z1, isTin, style, wallCol, trimCol, unfinished, pts: simplifyRing(raw, 0.85) };
 }
@@ -230,12 +230,13 @@ function buildAll() {
       const tri = THREE.ShapeUtils.triangulateShape(pts.map(p => new THREE.Vector2(p[0], p[1])), []);
       const k0 = roof.verts;
       for (const p of pts) { roof.pos.push(p[0], z1, -p[1]); roof.nor.push(0, 1, 0); roof.uv.push(p[0] / 7, p[1] / 7); roof.col.push(rc.r, rc.g, rc.b); roof.h.push(10); }
-      for (const t of tri) roof.idx.push(k0 + t[0], k0 + t[2], k0 + t[1]);
+      // Map (x, y) -> world (x, height, -y) already gives Earcut's triangles upward winding.
+      for (const t of tri) roof.idx.push(k0 + t[0], k0 + t[1], k0 + t[2]);
       if (!unfinished) { // parapet with a concrete coping
         const ph = 0.95;
         for (let i = 0; i < n; i++) {
           const e = E[i]; if (e.hid >= z1) continue; // a taller neighbour (often a cut piece of the same blob) already stands in this plane
-          wall(W.blank, e.p, e.q, e.n, z1, z1 + ph, wallCol.clone().multiplyScalar(0.96), top, 0, 0, z1 - 20, z1 - 20);
+          wall(W.blank, e.p, e.q, e.n, z1, z1 + ph, (ov.parapet ? C(ov.parapet) : wallCol.clone().multiplyScalar(0.96)), top, 0, 0, z1 - 20, z1 - 20);
           trim.box(e.p, e.u, e.n, -0.03, e.L + 0.03, -0.18, 0.04, z1 + ph, z1 + ph + 0.07, trimCol, 'ft', -1e3);
         }
       } else { // unfinished top floor: stub columns with rusty rebar sticking out, at corners and every ~3.5 m
@@ -281,7 +282,7 @@ function buildAll() {
     BLD.push({ c: b.c, top: z1, floors });
     if (lst) decorateLandmark(b, lst, z1 + (isTin ? 0 : 0.95));
     const shopEdges = E.map((e, i) => (e.shop ? i : -1)).filter(i => i >= 0);
-    if (shopEdges.length) SHOPLIST.push({ pts, edges: shopEdges, sign: lst && lst.kind === 'bank' ? 'bank' : null, wall: wallCol, floors, top });
+    if (shopEdges.length) SHOPLIST.push({ pts, edges: shopEdges, sign: lst && lst.kind === 'bank' ? 'bank' : null, wall: wallCol, floors, top, buildingId: bi, profile: ov.shopfront || null });
   });
   buildShopfronts(SHOPLIST);
   for (const k in W) W[k].mesh(FM[k]);

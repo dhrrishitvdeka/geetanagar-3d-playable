@@ -236,9 +236,17 @@ def({ id: 'pori', title: 'A friend for Pori', reward: 20, giver: 'raju', hint: '
       done: q => { if (!inPark()) return false; const p = poriPos(); return !!p && Math.hypot(p.x - pl.x, p.y - pl.y) < 20; } },
   ] });
 
+// The binoculars announce each place once per session, including before Kakati offers his quest.
+function rememberBinocularSight({ placeId } = {}) {
+  if (!SPOTS_3.includes(placeId)) return;
+  const seen = state.flags.binocular_spotted || [];
+  if (!seen.includes(placeId)) setFlag('binocular_spotted', [...seen, placeId]);
+}
+function priorBinocularSightings() { return (state.flags.binocular_spotted || []).filter(id => SPOTS_3.includes(id)); }
+
 def({ id: 'eyes_on_city', title: 'Eyes on the city', reward: 50, giver: 'kakati', hint: 'Talk to Kakati Khura at the View point',
   desc: 'Kakati Khura wants you to find three places through his binoculars from the View point terrace. He knows where the gamosa are hiding.',
-  init: () => ({ seen: [] }),
+  init: () => ({ seen: priorBinocularSightings() }),
   onComplete: () => { setFlag('gamosa_map', true); toast('Now you know where to look: gamosa markers show on your map', { kind: 'good' }); },
   on: { 'binocular:spotted': (q, p) => {
     if (q.step !== 1 || !p || !SPOTS_3.includes(p.placeId) || q.data.seen.includes(p.placeId)) return;
@@ -632,6 +640,7 @@ function initQuests() {
   reg('raju', talkRaju); reg('kakati', talkKakati); reg('anjali', talkAnjali); reg('dipen', talkDipen); reg('bahadur', talkBahadur);
   reg('khagen', talkKhagen); reg('bina', talkBina); reg('jonali', talkJonali); reg('nabin', talkNabin);
   // event hooks: one listener per event type; quests mutate their own data, then the next poll runs the step tests
+  on('binocular:spotted', rememberBinocularSight);
   const events = new Set(); for (const id of ORDER) if (QUESTS[id].on) for (const ev of Object.keys(QUESTS[id].on)) events.add(ev);
   for (const ev of events) on(ev, p => {
     if (!live) return;
